@@ -1,15 +1,16 @@
-"""voice-personalizer - Entry Point.
+"""Voice Agent - entry point.
 
-Combines server-side endpoints with the client-side UI.
+The Chrome extension is the real UI; the backend normally runs headless with
+`jac start --no-client`. This module still mounts a small dashboard at `/` so
+the profile graph can be inspected in a browser during development.
 """
 
-import from endpoints { Message, PostMessage, ListMessages }
+import from endpoints { GetProfile, AddFact, ResetAll, GetHistory }
 
-# Client-side UI
 cl {
-    import from .frontend { app as ClientApp }
+    import from .frontend { app as DashboardApp }
 
     def:pub app -> JsxElement {
-        return <ClientApp/>;
+        return <DashboardApp/>;
     }
 }

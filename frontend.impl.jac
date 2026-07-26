@@ -1,16 +1,19 @@
-"""Implementations for the voice-personalizer frontend component."""
+"""Implementations for the dashboard component."""
 
-impl app.loadMessages -> None {
-    result = root spawn ListMessages();
-    messages = result.reports;
+impl app.refresh -> None {
+    prof = root spawn GetProfile();
+    hist = root spawn GetHistory();
+    if len(prof.reports) > 0 {
+        facts = prof.reports[0]["facts"];
+    }
+    if len(hist.reports) > 0 {
+        sites = hist.reports[0]["sites"];
+    }
+    loading = False;
 }
 
-impl app.postMessage(e: FormEvent) -> None {
-    e.preventDefault();
-    if not author.strip() or not text.strip() {
-        return;
-    }
-    result = root spawn PostMessage(author=author, text=text);
-    messages = messages + [result.reports[0]];
-    text = "";
+impl app.reset -> None {
+    root spawn ResetAll();
+    facts = [];
+    sites = [];
 }
