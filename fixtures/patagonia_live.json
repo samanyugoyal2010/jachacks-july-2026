@@ -1,0 +1,38 @@
+{
+  "_note": "Captured from the LIVE patagonia.com homepage with the real content-script extractor. Kept because it is the hard case: an image-led storefront whose visible h1/h2 have essentially no prose under them, so the planner must fall back to the full page text. Fixture patagonia.json is the easy case (rich section bodies).",
+  "page": {
+    "url": "https://www.patagonia.com/home/",
+    "title": "Patagonia Outdoor Clothing & Gear",
+    "description": "Patagonia is a designer of outdoor clothing and gear for the silent sports: climbing, surfing, skiing and snowboarding, fly fishing, and trail running",
+    "text": "Read Our Work in Progress Report\nFree Shipping on Orders Over $99\nEarth Is Now Our Only Shareholder\nPatagonia Kids\n\nMade for outsiders\n\nShop Kids' & Baby\n\nBaggies\n\nCapilene Cool Tech Tees\n\nPerformance Foundations\n\nKids' & Baby Clothing\n\nPatagonia Provisions\n\nBooks\n\nInnovation Unusual\n\nWe take responsibility for our impact.\n\nOur Footprint\n\nClimbing\n\nTrail Running\n\nSurfing\n\nLatest Stories\n\nWe guarantee everything we make.\n\nView Ironclad Guarantee\n\nWe take responsibility for our impact.\n\nExplore Our Footprint\n\nWe support grassroots activism.\n\nVisit Patagonia Action Works\n\nWe keep your gear going.\n\nVisit Worn Wear\n\nWe give our profits to the planet.\n\nRead Our Commitment\n\nNeed Help?\nHelp Center Order Status Size & Fit Guide Returns & Exchanges DIY Care & Repair Trade In. Get Credit.\n\n1% For The Planet\nWorn Wear\nOur Core Values\nProgress Report\nClimate Goals",
+    "sections": [
+      { "heading": "Patagonia Kids", "body": "", "level": 1 },
+      { "heading": "We take responsibility for our impact.", "body": "", "level": 2 },
+      { "heading": "Latest Stories", "body": "", "level": 2 }
+    ],
+    "nav": [
+      { "label": "Men's", "href": "https://www.patagonia.com/shop/mens" },
+      { "label": "Women's", "href": "https://www.patagonia.com/shop/womens" },
+      { "label": "Kids'", "href": "https://www.patagonia.com/shop/kids-baby" },
+      { "label": "Packs & Gear", "href": "https://www.patagonia.com/shop/gear" },
+      { "label": "Food & Beer", "href": "https://www.patagonia.com/provisions/" },
+      { "label": "Patagonia Action Works", "href": "https://www.patagonia.com/actionworks/home/choose-location/" }
+    ],
+    "images": [
+      {
+        "url": "https://www.patagonia.com/dw/image/v2/bdjb_PRD/on/demandware.static/-/Library-Sites-PatagoniaShared/default/dwfe970cda/category/kids/PAT_S26_Kids_hero-rich_corey_00368_cc_WEB.jpg",
+        "alt": ""
+      },
+      {
+        "url": "https://www.patagonia.com/dw/image/v2/bdjb_PRD/on/demandware.static/-/Library-Sites-PatagoniaShared/default/dwe10324f8/category/hero/Homepage_Hero_Footprint-oberly_keri_00214_cc_WEB.jpg",
+        "alt": ""
+      }
+    ],
+    "brand": {
+      "primary": "rgb(0, 0, 0)",
+      "accent": "",
+      "fontBody": "\"Ridgeway Sans\", system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+      "logo": ""
+    }
+  }
+}

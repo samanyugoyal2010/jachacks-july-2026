@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Voice Agent — rebuild any page around you",
+  "version": "0.1.0",
+  "description": "Talk to any website. It learns who you are and rebuilds the page around you.",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "activeTab", "scripting", "sidePanel", "offscreen"],
+  "host_permissions": ["http://localhost:8000/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Voice Agent" },
+  "side_panel": { "default_path": "sidepanel/sidepanel.html" },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content/content.bundle.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "commands": {
+    "toggle-recording": {
+      "suggested_key": { "default": "Ctrl+Shift+U", "mac": "Command+Shift+U" },
+      "description": "Talk to the voice agent"
+    }
+  }
+}

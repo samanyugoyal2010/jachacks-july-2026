@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Allow the microphone</title>
+<style>
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0d10;color:#e8ecf2;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+  .box{max-width:44ch;text-align:center;padding:2.5rem;line-height:1.6}
+  h1{font-size:1.35rem;margin:0 0 .6rem;letter-spacing:-.02em}
+  p{color:#8e99a8;margin:0 0 1rem}
+  code{background:#171b21;padding:.15rem .4rem;border-radius:5px;color:#c9d3e0}
+  .err{color:#f87171}
+</style></head>
+<body><div class="box">
+  <h1>Allow the microphone</h1>
+  <p>Chrome is asking once, for the extension itself. After you allow it, this
+     tab closes and you can talk to the agent on any page.</p>
+  <p id="status"></p>
+</div><script src="permission.js" type="module"></script></body></html>

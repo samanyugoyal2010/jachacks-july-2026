@@ -5,3 +5,7 @@ node_modules/
 
 # Secrets
 .env
+
+# Extension build artifacts
+extension/node_modules/
+extension/content/content.bundle.js

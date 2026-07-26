@@ -135,22 +135,30 @@ def page_for_planner(page: dict, profile_text: str) -> str {
     }
     scored.sort(key=lambda (s: dict) { -s["score"]; });
 
+    prose_len = 0;
     if len(scored) > 0 {
         lines.append("");
         lines.append("SECTIONS, already ordered by relevance to this reader:");
         rank = 1;
         for s in scored[:MAX_SECTIONS] {
             lines.append(f"\n[{rank}] {s['heading']}");
-            if s["body"] != "" {
-                lines.append(str(s["body"]));
+            sec_body = str(s["body"]);
+            if sec_body != "" {
+                lines.append(sec_body);
+                prose_len += len(sec_body);
             }
             rank += 1;
         }
-    } else {
+    }
+
+    # Image-led pages (storefronts, landing pages) yield headings with almost
+    # no prose under them. Without this the planner would have nothing but
+    # labels to rewrite and would start inventing copy.
+    if prose_len < 400 {
         body_text = str(page.get("text", "")).strip();
         if body_text != "" {
             lines.append("");
-            lines.append("PAGE TEXT:");
+            lines.append("FULL PAGE TEXT (the sections above were thin, use this for detail):");
             lines.append(body_text[:MAX_TEXT]);
         }
     }

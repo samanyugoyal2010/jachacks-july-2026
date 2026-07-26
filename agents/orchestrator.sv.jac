@@ -132,7 +132,8 @@ def orchestrate(transcript: str, profile_summary: str, page_title: str) -> str {
     } elif decision.intent == Intent.READ_PAGE_ALOUD {
         outcome = read_page_aloud();
     } elif decision.intent == Intent.RECALL_PROFILE {
-        known = whats_known();
+        # The walker already read this off the graph; no need to go back.
+        known = profile_summary if profile_summary.strip() != "" else whats_known();
         outcome = f"what is known about the user: {known}";
     } else {
         ctx = f"the user is on a page titled '{page_title}'" if page_title != "" else "no page context";

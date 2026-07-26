@@ -13,6 +13,7 @@ include graph;
 import from agents.orchestrator { orchestrate }
 import from agents.page { set_current_page, take_last_recon, take_last_html }
 import from agents.profile { profile_as_text }
+import from services.speech { transcribe, synthesize }
 
 
 # ─────────────────────────────── converse ───────────────────────────────
@@ -26,8 +27,11 @@ walker:pub Converse {
 
     can run with Root entry {
         transcript = self.text.strip();
+        if transcript == "" and self.audio_b64 != "" {
+            transcript = transcribe(self.audio_b64);
+        }
         if transcript == "" {
-            report {"ok": False, "error": "no text or audio supplied"};
+            report {"ok": False, "error": "nothing to transcribe"};
             disengage;
         }
 
@@ -54,6 +58,7 @@ walker:pub Converse {
             "ok": True,
             "transcript": transcript,
             "spoken_reply": spoken,
+            "audio_b64": synthesize(spoken),
             "recon_id": take_last_recon(),
             "html": take_last_html(),
             "profile_summary": summarize_profile()
