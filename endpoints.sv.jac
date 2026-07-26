@@ -10,12 +10,62 @@ hackathon scope.
 """
 
 include graph;
+import from agents.orchestrator { orchestrate }
+import from agents.page { set_current_page, take_last_recon }
+import from agents.profile { profile_as_text }
+
+
+# ─────────────────────────────── converse ───────────────────────────────
+
+"""The main turn endpoint. One utterance in, one spoken reply out."""
+walker:pub Converse {
+    has text: str = "",
+        audio_b64: str = "",
+        page: dict = {},
+        reports: list[dict] = [];
+
+    can run with Root entry {
+        transcript = self.text.strip();
+        if transcript == "" {
+            report {"ok": False, "error": "no text or audio supplied"};
+            disengage;
+        }
+
+        # Make the page visible to the orchestrator's tools.
+        set_current_page(self.page);
+
+        title = str(self.page.get("title", ""));
+        url = str(self.page.get("url", ""));
+        if url != "" {
+            record_visit(url, title);
+        }
+
+        try {
+            spoken = orchestrate(transcript, summarize_profile(), title);
+        } except Exception as e {
+            print(f"[converse] orchestrate failed: {e}");
+            spoken = "Sorry, I had trouble with that. Could you say it again?";
+        }
+
+        save_turn("user", transcript);
+        save_turn("assistant", spoken);
+
+        report {
+            "ok": True,
+            "transcript": transcript,
+            "spoken_reply": spoken,
+            "recon_id": take_last_recon(),
+            "profile_summary": summarize_profile()
+        };
+    }
+}
 
 # ─────────────────────────────── profile ───────────────────────────────
 
 """Report everything currently known about the user."""
 walker:pub GetProfile {
-    has reports: list[dict] = [];
+    has derive: bool = False,
+        reports: list[dict] = [];
 
     can run with Root entry {
         prof = get_or_create_profile();
@@ -23,13 +73,18 @@ walker:pub GetProfile {
             {"kind": f.kind, "value": f.value, "created_at": f.created_at}
             for f in [prof -->][?:PreferenceFact]
         ];
-        report {
+        out = {
             "version": prof.version,
             "created_at": prof.created_at,
             "fact_count": len(facts),
             "facts": facts,
             "summary": summarize_profile()
         };
+        # Deriving costs an LLM call, so it is opt-in.
+        if self.derive {
+            out["derived"] = profile_as_text();
+        }
+        report out;
     }
 }
 
@@ -108,3 +163,4 @@ walker:pub GetHistory {
         report {"turns": turns, "sites": sites};
     }
 }
+

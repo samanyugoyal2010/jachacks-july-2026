@@ -5,7 +5,7 @@ The Chrome extension is the real UI; the backend normally runs headless with
 the profile graph can be inspected in a browser during development.
 """
 
-import from endpoints { GetProfile, AddFact, ResetAll, GetHistory }
+import from endpoints { Converse, GetProfile, AddFact, ResetAll, GetHistory }
 
 cl {
     import from .frontend { app as DashboardApp }
