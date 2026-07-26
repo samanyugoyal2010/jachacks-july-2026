@@ -11,7 +11,7 @@ hackathon scope.
 
 include graph;
 import from agents.orchestrator { orchestrate }
-import from agents.page { set_current_page, take_last_recon }
+import from agents.page { set_current_page, take_last_recon, take_last_html }
 import from agents.profile { profile_as_text }
 
 
@@ -55,6 +55,7 @@ walker:pub Converse {
             "transcript": transcript,
             "spoken_reply": spoken,
             "recon_id": take_last_recon(),
+            "html": take_last_html(),
             "profile_summary": summarize_profile()
         };
     }

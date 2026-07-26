@@ -8,8 +8,11 @@ of a voice conversation.
 """
 
 include graph;
-
 import from llm { chat_llm, fast_llm }
+import from agents.planner { plan_page, PageSpec, PageBlock, BlockLayout }
+import from agents.profile { profile_as_text }
+import from pipeline.rank { page_for_planner, extraction_quality, topics_from_profile, score_section }
+import from pipeline.render { render_page }
 
 glob current_page: dict = {};
 
@@ -109,12 +112,14 @@ def read_page_aloud -> str {
 sem read_page_aloud = "Read out or summarize the page the user is currently looking at. Use this when they ask you to read, summarize, explain or 'tell me about' this page. The text you return will be spoken to them, so pass it through as your reply.";
 
 # ─────────────────────────── reconstruction ───────────────────────────
-# Real implementation lands in M4 (rank -> plan_page -> render_page).
+# rank -> plan_page -> render_page -> graph. The walker picks the id up after.
 
 glob last_recon_id: str = "";
+glob last_recon_html: str = "";
 
-def set_last_recon(recon_id: str) {
+def set_last_recon(recon_id: str, html: str) {
     last_recon_id = recon_id;
+    last_recon_html = html;
 }
 
 def take_last_recon -> str {
@@ -123,12 +128,159 @@ def take_last_recon -> str {
     return out;
 }
 
+def take_last_html -> str {
+    out = last_recon_html;
+    last_recon_html = "";
+    return out;
+}
+
+"""Reorder planned blocks so interest matches rise, and label the top one.
+
+The hero (index 0) is pinned. Everything after it is scored against the user's
+interest topics with the same matcher the section ranker uses, then sorted
+stably so blocks that tie keep the planner's chosen order.
+"""
+def enforce_interest_order(blocks: list[PageBlock], profile_text: str) -> list[PageBlock] {
+    if len(blocks) < 3 {
+        return blocks;
+    }
+    topics = topics_from_profile(profile_text);
+    if len(topics) == 0 {
+        return blocks;
+    }
+
+    head = blocks[0];
+    rest = blocks[1:];
+
+    scored = [];
+    i = 0;
+    for b in rest {
+        # Later blocks get a small position penalty so ties stay stable.
+        s = score_section(b.heading, b.body, topics, 0) - (0.01 * float(i));
+        scored.append({"block": b, "score": s});
+        i += 1;
+    }
+    scored.sort(key=lambda (x: dict) { -x["score"]; });
+
+    ordered = [head];
+    promoted = False;
+    for entry in scored {
+        b = entry["block"];
+        # Give the single best match a note if the planner did not write one,
+        # so the reader can see WHY the page opens where it does.
+        if not promoted and entry["score"] > 0.0 {
+            if b.personalized_note.strip() == "" {
+                b.personalized_note = f"Moved up because you follow {topics[0]}.";
+            }
+            promoted = True;
+        }
+        ordered.append(b);
+    }
+    return ordered;
+}
+
+"""Build a plan deterministically, with no LLM. The floor of the fallback chain."""
+def literal_plan(page: dict) -> PageSpec {
+    title = str(page.get("title", "")).strip();
+    if title == "" {
+        title = "This page";
+    }
+    blocks = [];
+    secs = page.get("sections", []);
+    if isinstance(secs, list) {
+        for s in secs[:6] {
+            heading = str(s.get("heading", "")).strip();
+            body = str(s.get("body", "")).strip();
+            if heading == "" and body == "" {
+                continue;
+            }
+            blocks.append(PageBlock(
+                layout=BlockLayout.TEXT_ONLY,
+                eyebrow="", heading=heading if heading != "" else title,
+                body=body[:400], cta_label="", cta_href="",
+                image_url="", personalized_note=""
+            ));
+        }
+    }
+    if len(blocks) == 0 {
+        body = str(page.get("text", "")).strip()[:600];
+        blocks.append(PageBlock(
+            layout=BlockLayout.HERO_CENTERED, eyebrow="", heading=title,
+            body=body if body != "" else "We could not read much from this page.",
+            cta_label="", cta_href="", image_url="", personalized_note=""
+        ));
+    }
+    return PageSpec(page_title=title, tagline="", blocks=blocks, nav_labels=[]);
+}
+
 """Rebuild the current page, personalized to the stored profile."""
 def rebuild_page -> str {
     if not has_page() {
         return "no page content is available for this tab";
     }
-    return "reconstruction is not wired up yet";
+
+    page = current_page;
+    title = str(page.get("title", ""));
+    url = str(page.get("url", ""));
+    brand = page.get("brand", {});
+    if not isinstance(brand, dict) {
+        brand = {};
+    }
+
+    profile_text = profile_as_text();
+    quality = extraction_quality(page);
+    fallback_level = 0;
+    spec = None;
+
+    # Level 2: too little real content to be worth an LLM call.
+    if quality < 0.3 {
+        fallback_level = 2;
+        spec = literal_plan(page);
+    } else {
+        try {
+            spec = plan_page(page_for_planner(page, profile_text), profile_text);
+        } except Exception as e {
+            # Level 3: the planner failed. Personalization degrades to a
+            # faithful plain reconstruction; the renderer is unaffected.
+            print(f"[rebuild] plan_page failed, using literal plan: {e}");
+            fallback_level = 3;
+            spec = literal_plan(page);
+        }
+    }
+
+    if len(spec.blocks) == 0 {
+        fallback_level = 3;
+        spec = literal_plan(page);
+    }
+
+    # The planner is told to preserve the pre-ranked section order and reliably
+    # does not - it reshuffles by its own sense of importance, which buries the
+    # thing the user actually cares about. Ordering is the whole product, so it
+    # gets enforced here instead of hoped for. The hero stays pinned at index 0.
+    spec.blocks = enforce_interest_order(spec.blocks, profile_text);
+
+    try {
+        html = render_page(
+            spec, url,
+            str(brand.get("primary", "")),
+            str(brand.get("accent", "")),
+            str(brand.get("fontBody", "")),
+            str(brand.get("logo", "")),
+            profile_text
+        );
+    } except Exception as e {
+        print(f"[rebuild] render_page failed: {e}");
+        return f"could not render the rebuilt page: {e}";
+    }
+
+    recon = save_reconstruction(url, title, html, fallback_level);
+    set_last_recon(jid(recon), html);
+
+    n = len(spec.blocks);
+    if fallback_level == 0 {
+        return f"rebuilt the page as {n} sections, reordered and rewritten for this user";
+    }
+    return f"rebuilt the page as {n} plain sections; personalization was skipped (fallback level {fallback_level})";
 }
 
 sem rebuild_page = "Rebuild the web page the user is currently looking at as a new page personalized to them, keeping the original's real content. Use this when they ask to redesign, rebuild, personalize, simplify or fix this page.";

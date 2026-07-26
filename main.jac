@@ -6,6 +6,7 @@ the profile graph can be inspected in a browser during development.
 """
 
 import from endpoints { Converse, GetProfile, AddFact, ResetAll, GetHistory }
+import from pipeline.serve { GetSite }
 
 cl {
     import from .frontend { app as DashboardApp }

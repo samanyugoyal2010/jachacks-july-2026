@@ -1,0 +1,59 @@
+{
+  "text": "Patagonia is in business to save our home planet. We make clothing and gear for climbing, surfing, skiing, trail running and fly fishing. Everything we build is designed to last and to be repaired rather than replaced. We give one percent of sales to grassroots environmental groups.",
+  "page": {
+    "url": "https://www.patagonia.com/",
+    "title": "Patagonia - Outdoor Clothing & Gear",
+    "description": "Outdoor clothing and gear built to last, for climbing, surfing, skiing, trail running and fly fishing.",
+    "text": "Patagonia is in business to save our home planet. We build clothing and gear for silent sports: climbing, surfing, skiing and snowboarding, fly fishing, and trail running. Our Ironclad Guarantee means we repair what we make. We give 1% of sales to grassroots environmental groups. Worn Wear lets you buy and trade used Patagonia gear.",
+    "brand": {
+      "primary": "rgb(19, 21, 22)",
+      "accent": "rgb(200, 16, 46)",
+      "fontBody": "Helvetica Neue, Helvetica, Arial, sans-serif",
+      "logo": "https://www.patagonia.com/static/logo.png"
+    },
+    "nav": [
+      { "label": "Shop", "href": "https://www.patagonia.com/shop/" },
+      { "label": "Activism", "href": "https://www.patagonia.com/activism/" },
+      { "label": "Worn Wear", "href": "https://wornwear.patagonia.com/" },
+      { "label": "Stories", "href": "https://www.patagonia.com/stories/" },
+      { "label": "Repairs", "href": "https://www.patagonia.com/repairs/" }
+    ],
+    "images": [
+      { "url": "https://www.patagonia.com/static/hero-mountains.jpg", "alt": "Climber on a granite face at sunrise" },
+      { "url": "https://www.patagonia.com/static/trail-running.jpg", "alt": "Runner on a mountain ridge trail" },
+      { "url": "https://www.patagonia.com/static/worn-wear.jpg", "alt": "Repaired jacket on a workbench" }
+    ],
+    "sections": [
+      {
+        "heading": "Fly Fishing",
+        "level": 2,
+        "body": "Waders, packs and technical layers built for long days in cold water. Our waders are guaranteed for life and repairable at any Patagonia service centre."
+      },
+      {
+        "heading": "Our Ironclad Guarantee",
+        "level": 2,
+        "body": "If a product does not perform to your satisfaction, return it for a repair, replacement or refund. Damage due to wear and tear will be repaired at a reasonable charge."
+      },
+      {
+        "heading": "Trail Running",
+        "level": 2,
+        "body": "Lightweight, breathable kit for moving fast over rough ground. The Endless Run collection uses recycled polyester and is cut for a full range of motion on technical descents."
+      },
+      {
+        "heading": "Worn Wear: Better Than New",
+        "level": 2,
+        "body": "Buy used Patagonia gear, trade in what you no longer wear, or learn to repair it yourself with our free guides. Keeping clothing in use for nine extra months cuts its carbon footprint substantially."
+      },
+      {
+        "heading": "1% for the Planet",
+        "level": 2,
+        "body": "We give one percent of sales to grassroots environmental organisations. Since 1985 that has come to over 140 million dollars in cash and in-kind donations."
+      },
+      {
+        "heading": "Snowboarding & Skiing",
+        "level": 2,
+        "body": "Storm-ready shells and insulation tested in the Tetons. Built with recycled fabrics and PFC-free durable water repellent."
+      }
+    ]
+  }
+}

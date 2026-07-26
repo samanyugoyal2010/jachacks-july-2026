@@ -14,7 +14,13 @@ LOG=/tmp/jac-dev.log
 
 restart() {
   pkill -f "jac start" 2>/dev/null
+  # pkill alone misses detached children, and a survivor holding :8000 makes
+  # the new server silently bind :8001 - so you end up testing stale code.
+  lsof -ti:8000 2>/dev/null | xargs -r kill -9 2>/dev/null
   sleep 3
+  if lsof -ti:8000 >/dev/null 2>&1; then
+    echo "port 8000 still held; aborting"; return 1
+  fi
   nohup jac start --no-client -p 8000 >"$LOG" 2>&1 &
   for _ in $(seq 1 60); do
     sleep 2
