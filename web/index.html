@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glass Box — auditable AI decisioning</title>
+<script src="/vendor/vis-network.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#121826; --panel2:#0e1420; --line:#1e2839;
+    --ink:#e6ecf5; --muted:#8a97ad; --accent:#5b9dff;
+    --app:#5b9dff; --fact:#8593a8; --assess:#2dd4bf; --draft:#f2b13c;
+    --pass:#3ecf8e; --veto:#ff5c6c; --approve:#3ecf8e; --deny:#ff5c6c;
+    --plan:#a78bfa; --step:#c4b5fd;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+  #app{display:grid;grid-template-columns:300px 1fr 340px;grid-template-rows:auto 1fr;height:100vh}
+  @media (max-width:1180px){ #app{grid-template-columns:250px 1fr 290px} }
+  @media (max-width:960px){
+    #app{grid-template-columns:1fr 300px}
+    #left{grid-column:1/3;grid-row:2;border-right:none;border-bottom:1px solid var(--line);max-height:170px}
+    #graph{grid-column:1/2;grid-row:3}
+    #right{grid-column:2/3;grid-row:3}
+  }
+  header{grid-column:1/4;display:flex;align-items:baseline;gap:14px;padding:12px 20px;
+    border-bottom:1px solid var(--line);background:var(--panel2)}
+  header h1{font-size:17px;margin:0;letter-spacing:.2px}
+  header .tag{color:var(--muted);font-size:12.5px}
+  header .spacer{flex:1}
+  .engine{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;
+    padding:2px 9px;margin-left:6px}
+  .engine.groq{color:#f2b13c;border-color:rgba(242,177,60,.4)}
+  .engine.det{color:var(--assess);border-color:rgba(45,212,191,.35)}
+  .step.load{border-color:var(--accent);background:rgba(91,157,255,.08)}
+  @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+  .step.load{animation:pulse 1.1s ease-in-out infinite}
+  .legend{display:flex;gap:12px;font-size:11px;color:var(--muted);flex-wrap:wrap}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  aside{background:var(--panel);border-right:1px solid var(--line);padding:16px;overflow:auto}
+  #right{border-right:none;border-left:1px solid var(--line)}
+  h2{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:2px 0 10px}
+  .case{width:100%;text-align:left;background:var(--panel2);border:1px solid var(--line);
+    color:var(--ink);border-radius:9px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:.12s}
+  .case:hover{border-color:var(--accent)}
+  .case.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .case b{display:block;font-size:13px;margin-bottom:2px}
+  .case small{color:var(--muted);font-size:11.5px;line-height:1.35;display:block}
+  .btns{display:flex;gap:8px;margin:14px 0}
+  button.act{flex:1;border:none;border-radius:9px;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer}
+  #run{background:var(--accent);color:#04122e}
+  #run:disabled{opacity:.5;cursor:default}
+  #reset{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+  #log{margin-top:8px;display:flex;flex-direction:column;gap:7px}
+  .step{font-size:12.5px;line-height:1.4;padding:9px 11px;border-radius:8px;background:var(--panel2);
+    border:1px solid var(--line);opacity:0;transform:translateY(4px);transition:.35s}
+  .step.on{opacity:1;transform:none}
+  .step.veto{border-color:var(--veto);background:rgba(255,92,108,.08)}
+  .step.flip{border-color:var(--approve);background:rgba(62,207,142,.08)}
+  #banner{margin:0 0 6px;padding:12px;border-radius:10px;border:1px solid var(--line);
+    background:var(--panel2);display:none}
+  #banner.show{display:block}
+  #banner .row{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+  .pill{padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
+  .pill.deny{background:rgba(255,92,108,.15);color:var(--deny)}
+  .pill.approve{background:rgba(62,207,142,.15);color:var(--approve)}
+  .arrow{color:var(--muted)}
+  #banner small{color:var(--muted);display:block;margin-top:6px;font-weight:400;font-size:11.5px}
+  #graph{position:relative}
+  #net{position:absolute;inset:0}
+  #hint{position:absolute;left:0;right:0;top:46%;text-align:center;color:var(--muted);font-size:14px;pointer-events:none}
+  /* inspector */
+  #ins .empty{color:var(--muted);font-size:13px;line-height:1.5}
+  .chip{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+    padding:3px 8px;border-radius:6px;margin-bottom:10px}
+  .kv{font-size:12.5px;margin:8px 0;line-height:1.45}
+  .kv .k{color:var(--muted);display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .kv .v{color:var(--ink)}
+  .kv .v.bad{color:var(--veto);font-weight:600}
+  .finding{border-left:3px solid var(--veto);padding:8px 11px;background:rgba(255,92,108,.07);
+    border-radius:0 8px 8px 0;font-size:12.5px;line-height:1.45;margin-top:6px}
+  .finding.ok{border-left-color:var(--pass);background:rgba(62,207,142,.06)}
+  button.trace{margin-top:14px;width:100%;background:var(--panel2);border:1px solid var(--accent);
+    color:var(--accent);border-radius:8px;padding:9px;font-size:12.5px;font-weight:600;cursor:pointer}
+  #lineage{margin-top:12px;display:none}
+  #lineage.show{display:block}
+  .hop{font-size:12px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;
+    position:relative;background:var(--panel2)}
+  .hop:not(:last-child):after{content:"↑";position:absolute;left:14px;bottom:-14px;color:var(--muted);font-size:11px}
+  /* diff */
+  #diff{margin-top:14px;display:none}
+  #diff.show{display:block}
+  .diffrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .dcard{border:1px solid var(--line);border-radius:9px;padding:10px;font-size:12px}
+  .dcard.d{border-color:rgba(255,92,108,.4)}
+  .dcard.f{border-color:rgba(62,207,142,.4)}
+  .dcard h4{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .dcard li{margin:3px 0;line-height:1.3}
+  .dcard li.bad{color:var(--veto)}
+  .dcard li.struck{text-decoration:line-through;color:var(--muted);opacity:.7}
+  ul{margin:6px 0 0;padding-left:16px}
+  /* remediation panel */
+  #remediation{margin:10px 0 0;padding:12px;border-radius:10px;border:1px solid rgba(167,139,250,.4);
+    background:rgba(167,139,250,.07);display:none}
+  #remediation.show{display:block}
+  #remediation h3{margin:0 0 4px;font-size:13px;color:var(--plan)}
+  #remediation .sum{font-size:12px;color:var(--ink);line-height:1.45;margin-bottom:10px}
+  .rstep{border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:7px;background:var(--panel2)}
+  .rstep .top{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;margin-bottom:3px}
+  .rstep .cur{color:var(--muted);text-decoration:line-through}
+  .rstep .tgt{color:var(--step)}
+  .rstep .imp{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--approve);
+    background:rgba(62,207,142,.12);padding:2px 7px;border-radius:999px}
+  .rstep .act{font-size:11.5px;color:var(--muted);line-height:1.35}
+  #reapply{margin-top:6px;width:100%;background:var(--plan);color:#160c33;border:none;
+    border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer}
+  #reapply:disabled{opacity:.55;cursor:default}
+  #banner.reapply{border-color:var(--plan);background:rgba(167,139,250,.08)}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🔎 Glass Box</h1>
+    <span class="tag">auditable multi-agent loan decisioning — the audit trail <i>is</i> the data structure</span>
+    <span id="engine" class="engine">engine: —</span>
+    <span class="spacer"></span>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--app)"></i>Application</span>
+      <span><i class="dot" style="background:var(--fact)"></i>Fact</span>
+      <span><i class="dot" style="background:var(--assess)"></i>Assessment</span>
+      <span><i class="dot" style="background:var(--draft)"></i>Draft</span>
+      <span><i class="dot" style="background:var(--veto)"></i>Veto</span>
+      <span><i class="dot" style="background:var(--approve)"></i>Decision</span>
+      <span><i class="dot" style="background:var(--plan)"></i>Reapply plan</span>
+    </div>
+  </header>
+
+  <aside id="left">
+    <h2>Applicant case</h2>
+    <div id="cases"></div>
+    <div class="btns">
+      <button id="run" class="act">▶ Run decision</button>
+      <button id="reset" class="act">Reset</button>
+    </div>
+    <div id="banner"></div>
+    <div id="remediation"></div>
+    <h2 style="margin-top:14px">Agent trace</h2>
+    <div id="log"></div>
+  </aside>
+
+  <div id="graph">
+    <div id="net"></div>
+    <div id="hint">Pick a case and press <b>Run decision</b>.</div>
+  </div>
+
+  <aside id="right">
+    <h2>Inspector</h2>
+    <div id="ins"><div class="empty">Click any node to see who decided it, on what evidence, and why. Every node traces back to the raw application.</div></div>
+  </aside>
+</div>
+
+<script>
+const CASES = [
+  {id:"MARIA-001", name:"Maria Alvarez", tag:"the fairness veto",
+   desc:"$52k income, $900/mo debt. Receives public assistance.",
+   facts:{annual_income:"52000", monthly_debt:"900", receives_public_assistance:"true"},
+   raw_text:"Maria Alvarez — annual income $52,000, monthly debt $900. Receives public assistance."},
+  {id:"JORDAN-002", name:"Jordan Lee", tag:"clean approval",
+   desc:"$80k income, $500/mo debt. No prohibited factors.",
+   facts:{annual_income:"80000", monthly_debt:"500", receives_public_assistance:"false"},
+   raw_text:"Jordan Lee — annual income $80,000, monthly debt $500."},
+  {id:"SAM-003", name:"Sam Rivera", tag:"legitimate denial",
+   desc:"$30k income, $1,500/mo debt. Fails affordability.",
+   facts:{annual_income:"30000", monthly_debt:"1500", receives_public_assistance:"false"},
+   raw_text:"Sam Rivera — annual income $30,000, monthly debt $1,500."},
+];
+
+const TYPE = {
+  Application:{c:'#5b9dff', level:0, shape:'box'},
+  Fact:{c:'#8593a8', level:1, shape:'box'},
+  Assessment:{c:'#2dd4bf', level:2, shape:'box'},
+  DraftDecision:{c:'#f2b13c', level:3, shape:'box'},
+  Verification:{c:'#3ecf8e', level:4, shape:'box'},
+  Decision:{c:'#3ecf8e', level:5, shape:'box'},
+  RemediationPlan:{c:'#a78bfa', level:6, shape:'box'},
+  RemediationStep:{c:'#c4b5fd', level:7, shape:'box'},
+};
+const STAGE_ORDER = ['Application','Fact','Assessment','DraftDecision','Verification','Decision','RemediationPlan','RemediationStep'];
+
+let selected = CASES[0];
+let fullGraph = {nodes:[], edges:[]};
+let nodeById = {};
+let nodes, edges, network;
+let vetoActive = false;
+
+function initNet(){
+  nodes = new vis.DataSet([]); edges = new vis.DataSet([]);
+  network = new vis.Network(document.getElementById('net'), {nodes, edges}, {
+    layout:{hierarchical:{enabled:true, direction:'LR', sortMethod:'directed',
+      levelSeparation:210, nodeSpacing:95, treeSpacing:120, blockShifting:true, edgeMinimization:true}},
+    physics:false, interaction:{hover:true, dragNodes:true, zoomView:true},
+    nodes:{shape:'box', margin:9, borderWidth:1.5, font:{color:'#e6ecf5', size:13, face:'inherit'},
+      color:{background:'#121826', border:'#1e2839'}, shapeProperties:{borderRadius:8}},
+    edges:{arrows:{to:{enabled:true, scaleFactor:.6}}, color:{color:'#33415a', highlight:'#5b9dff'},
+      smooth:{type:'cubicBezier', roundness:.55}, font:{color:'#6b7a92', size:10, strokeWidth:0, align:'middle'}, width:1.4},
+  });
+  network.on('click', p => { if(p.nodes.length) showNode(p.nodes[0]); });
+}
+
+function nodeStyle(n){
+  const t = TYPE[n.type] || {c:'#888', level:6};
+  let border = t.c, bg = '#141b29', width = 1.5, label = n.label;
+  if(n.type==='Verification'){
+    const veto = !n.data.passed;
+    border = veto ? '#ff5c6c' : '#3ecf8e';
+    bg = veto ? 'rgba(255,92,108,.12)' : '#141b29';
+  }
+  if(n.type==='Decision'){
+    const ap = n.data.outcome==='APPROVE';
+    border = ap ? '#3ecf8e' : '#ff5c6c'; width = 2.5;
+    bg = ap ? 'rgba(62,207,142,.14)' : 'rgba(255,92,108,.14)';
+  }
+  if(n.type==='DraftDecision'){
+    const ap = n.data.outcome==='APPROVE';
+    border = ap ? '#3ecf8e' : '#f2b13c';
+  }
+  if(n.type==='Application'){ bg='rgba(91,157,255,.12)'; width=2; }
+  if(n.type==='RemediationPlan'){ bg='rgba(167,139,250,.16)'; border='#a78bfa'; width=2; }
+  if(n.type==='RemediationStep'){ bg='rgba(167,139,250,.09)'; border='#c4b5fd'; }
+  return {id:n.id, label, level:t.level, color:{background:bg, border, highlight:{background:bg, border:'#fff'}},
+    borderWidth:width, font:{color:'#e6ecf5'}};
+}
+
+function edgeStyle(e){
+  const base = {id:e.src+'|'+e.dst+'|'+e.rel, from:e.src, to:e.dst, label:e.rel, rel:e.rel};
+  if(e.rel==='vetoes') return {...base, color:{color:'#ff5c6c', highlight:'#ff5c6c'}, width:3,
+    dashes:[6,4], font:{color:'#ff8790', size:11}, arrows:{to:{enabled:true, scaleFactor:.9}}};
+  if(e.rel==='cites') return {...base, color:{color:'#2dd4bf', opacity:.6}, dashes:[2,3], width:1};
+  if(e.rel==='finalizes') return {...base, color:{color:'#3ecf8e'}, width:2};
+  if(e.rel==='advises') return {...base, color:{color:'#a78bfa'}, width:2};
+  if(e.rel==='step_of') return {...base, color:{color:'#a78bfa', opacity:.7}, width:1.4};
+  if(e.rel==='targets_fact') return {...base, color:{color:'#c4b5fd', opacity:.5}, dashes:[2,4], width:1};
+  return base;
+}
+
+// ---------- staged reveal ----------
+function step(txt, cls){
+  const d = document.createElement('div');
+  d.className = 'step' + (cls?(' '+cls):'');
+  d.innerHTML = txt;
+  document.getElementById('log').appendChild(d);
+  requestAnimationFrame(()=>d.classList.add('on'));
+}
+const wait = ms => new Promise(r=>setTimeout(r,ms));
+function setEngine(e){
+  const el = document.getElementById('engine');
+  if(e==='groq'){ el.textContent='engine: Groq (gpt-oss-120b)'; el.className='engine groq'; }
+  else { el.textContent='engine: deterministic'; el.className='engine det'; }
+}
+
+function addByStage(type){
+  const ns = fullGraph.nodes.filter(n=>n.type===type);
+  nodes.add(ns.map(nodeStyle));
+  const vis = new Set(nodes.getIds());
+  const toAdd = fullGraph.edges.filter(e=>vis.has(e.src)&&vis.has(e.dst))
+    .filter(e=>!edges.get(e.src+'|'+e.dst+'|'+e.rel));
+  edges.add(toAdd.map(edgeStyle));
+  network.fit({animation:{duration:500, easingFunction:'easeInOutQuad'}});
+}
+
+async function runCase(opts){
+  const reapply = !!opts;
+  const src = opts || {case_id:selected.id, raw_text:selected.raw_text, facts:selected.facts};
+  document.getElementById('run').disabled = true;
+  if(!reapply){
+    document.getElementById('log').innerHTML = '';
+    document.getElementById('banner').className = '';
+    document.getElementById('remediation').className = '';
+    clearInspector();
+  }
+  document.getElementById('hint').style.display='none';
+  nodes.clear(); edges.clear();
+
+  const load = document.createElement('div');
+  load.className = 'step load on';
+  load.innerHTML = reapply ? '⏳ Re-running the decision with your fix…' : '⏳ Agents reasoning…';
+  document.getElementById('log').appendChild(load);
+
+  await fetch('/api/reset',{method:'POST'});
+  const summary = await (await fetch('/api/run',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(src)})).json();
+  load.remove();
+  setEngine(summary.engine);
+  fullGraph = await (await fetch('/api/graph')).json();
+  nodeById = {}; fullGraph.nodes.forEach(n=>nodeById[n.id]=n);
+  vetoActive = fullGraph.nodes.some(n=>n.type==='Verification' && !n.data.passed);
+
+  const who = reapply ? '📨 <b>Reapplication</b>' : '📥 <b>Intake</b>';
+  step(`${who} reads the application…`); addByStage('Application'); await wait(600);
+  const nf = fullGraph.nodes.filter(n=>n.type==='Fact').length;
+  step(`📥 <b>Intake</b> extracted <b>${nf}</b> atomic facts.`); addByStage('Fact'); await wait(650);
+  step('🧮 <b>Affordability</b> + <b>Risk</b> analysts assess the facts, citing their evidence.');
+  addByStage('Assessment'); await wait(750);
+
+  const draft = fullGraph.nodes.find(n=>n.type==='DraftDecision');
+  step(`⚖️ <b>Adjudicator</b> drafts a decision: <span class="pill ${draft.data.outcome==='APPROVE'?'approve':'deny'}">${draft.data.outcome}</span>`);
+  addByStage('DraftDecision'); await wait(750);
+
+  if(vetoActive){
+    step('🛡️ <b>Policy Verifier</b> checks the draft against ECOA / Reg B…');
+    addByStage('Verification'); await wait(500);
+    const bad = fullGraph.nodes.find(n=>n.type==='Verification'&&!n.data.passed);
+    step(`🛡️ <b>VETO</b> — ${bad.data.finding}`, 'veto');
+    highlightVeto(); await wait(1000);
+    step(`⚖️ <b>Adjudicator</b> re-decides on permissible factors only.`);
+    addByStage('Decision'); await wait(600);
+  } else {
+    step('🛡️ <b>Policy Verifier</b>: all factors permissible — no veto.');
+    addByStage('Verification'); await wait(650);
+    addByStage('Decision'); await wait(550);
+  }
+
+  if(reapply){
+    reapplyBanner(summary);
+  } else {
+    banner(summary);
+    if(summary.denied && summary.has_plan){
+      step('🧭 <b>Advisor</b> turns the denial into a reapplication plan.');
+      addByStage('RemediationPlan'); addByStage('RemediationStep'); await wait(700);
+      showRemediation();
+    }
+  }
+  await wait(300);
+  network.fit({animation:{duration:600, easingFunction:'easeInOutQuad'}});
+  document.getElementById('run').disabled = false;
+}
+
+function highlightVeto(){
+  const e = fullGraph.edges.find(x=>x.rel==='vetoes');
+  if(!e) return;
+  network.selectEdges([e.src+'|'+e.dst+'|vetoes']);
+}
+
+function banner(s){
+  const b = document.getElementById('banner');
+  const flip = s.flipped;
+  b.className = 'show';
+  b.innerHTML = `<div class="row">
+      <span class="pill ${s.draft_outcome==='APPROVE'?'approve':'deny'}">${s.draft_outcome}</span>
+      <span class="arrow">→</span>
+      <span class="pill ${s.final_outcome==='APPROVE'?'approve':'deny'}">${s.final_outcome}</span>
+      ${flip?'<span style="color:var(--approve);font-size:12px">⟲ overturned by policy veto</span>':''}
+    </div>
+    <small>${flip? 'The draft leaned on a prohibited basis. The Policy Verifier caught it, and the decision was re-made on permissible factors only — no human in the loop.'
+       : (s.denied? 'A legitimate denial on a permissible factor. The Advisor builds a plan to fix it and reapply.'
+                  : 'Draft and final agree — the policy check found no prohibited factor.')}</small>`;
+  if(flip){ step(`✅ <b>Final: APPROVE</b> — the system caught and corrected its own unfair denial.`, 'flip'); }
+}
+
+function reapplyBanner(s){
+  const b = document.getElementById('banner');
+  const ok = s.final_outcome==='APPROVE';
+  b.className = 'show reapply';
+  b.innerHTML = `<div class="row">
+      <span class="pill deny">Denied</span><span class="arrow">→</span>
+      <span class="pill ${ok?'approve':'deny'}">Reapply: ${s.final_outcome}</span>
+      ${ok?'<span style="color:var(--plan);font-size:12px">✓ plan worked</span>':''}
+    </div>
+    <small>${ok? 'We re-ran the full decision on your corrected application — it now qualifies. This is a real run of the same agents, not a promise.'
+                : 'The correction was not sufficient; adjust the plan targets and try again.'}</small>`;
+  step(`✅ <b>Reapplication: ${s.final_outcome}</b> — the plan turned a denial into an approval.`, ok?'flip':'veto');
+}
+
+function showRemediation(){
+  const plan = fullGraph.nodes.find(n=>n.type==='RemediationPlan');
+  if(!plan){ return; }
+  const d = plan.data;
+  const steps = (d.steps||[]).map((s,i)=>`
+    <div class="rstep">
+      <div class="top"><span>${i+1}.</span> <span class="cur">${esc(s.current)}</span>
+        → <span class="tgt">${esc(s.target)}</span>
+        <span class="imp">${esc(s.impact)}</span></div>
+      <div class="act">${esc(s.action)}</div>
+    </div>`).join('');
+  const el = document.getElementById('remediation');
+  el.className = 'show';
+  el.innerHTML = `<h3>🧭 Reapplication plan</h3>
+    <div class="sum">${esc(d.summary)}</div>
+    ${steps}
+    <button id="reapply">▶ Simulate reapply (apply step 1)</button>`;
+  document.getElementById('reapply').onclick = ()=>simulateReapply(d.reapply_facts);
+}
+
+async function simulateReapply(facts){
+  const btn = document.getElementById('reapply');
+  if(btn){ btn.disabled = true; btn.textContent = 'Re-running…'; }
+  step('🔧 Applying the fix and reapplying…');
+  await runCase({case_id: selected.id + '-REAPPLY', raw_text: '', facts: facts});
+}
+
+// ---------- inspector ----------
+function clearInspector(){
+  document.getElementById('ins').innerHTML =
+    '<div class="empty">Click any node to see who decided it, on what evidence, and why.</div>';
+}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+function showNode(id){
+  const n = nodeById[id]; if(!n) return;
+  const t = TYPE[n.type]||{c:'#888'};
+  let color = t.c;
+  if(n.type==='Verification') color = n.data.passed?'#3ecf8e':'#ff5c6c';
+  if(n.type==='Decision'||n.type==='DraftDecision') color = n.data.outcome==='APPROVE'?'#3ecf8e':(n.type==='DraftDecision'?'#f2b13c':'#ff5c6c');
+  let h = `<span class="chip" style="background:${color}22;color:${color}">${n.type}</span>`;
+
+  const d = n.data;
+  if(n.type==='Application'){
+    h += kv('Case', d.case_id) + kv('Status', d.status) + kv('Application text', d.raw_text);
+  } else if(n.type==='Fact'){
+    h += kv('Fact', d.key) + kv('Value', d.value) + kv('Source', d.source) + kv('Confidence', d.confidence);
+  } else if(n.type==='Assessment'){
+    h += kv('Agent', d.agent) + kv('Verdict', d.verdict) + kv('Rationale', d.rationale);
+  } else if(n.type==='DraftDecision'){
+    h += kv('Draft outcome', d.outcome) + listKV('Reasons', d.reasons) + reliedKV(d.relied_on);
+  } else if(n.type==='Verification'){
+    h += kv('Rule', d.rule_id) + kv('Result', d.passed?'PASS':'VETO', !d.passed);
+    h += `<div class="finding ${d.passed?'ok':''}">${esc(d.finding)}</div>`;
+  } else if(n.type==='Decision'){
+    h += kv('Final outcome', d.outcome) + listKV('Reasons', d.reasons) + reliedKV(d.relied_on)
+       + (d.vetoed_once?'<div class="kv"><span class="v" style="color:var(--approve)">⟲ Revised after a policy veto</span></div>':'');
+    if(d.explanation) h += `<div class="kv"><span class="k">Applicant explanation (LLM)</span><span class="v" style="font-style:italic">${esc(d.explanation)}</span></div>`;
+  } else if(n.type==='RemediationPlan'){
+    h += kv('Target outcome', d.target_outcome) + kv('Feasible', d.feasible?'yes':'no')
+       + `<div class="kv"><span class="k">Plan</span><span class="v">${esc(d.summary)}</span></div>`
+       + `<div class="kv"><span class="k">Reapply with</span><span class="v">${Object.entries(d.reapply_facts||{}).map(([k,v])=>k+' = '+v).map(esc).join('<br>')}</span></div>`;
+  } else if(n.type==='RemediationStep'){
+    h += kv('Fix', d.factor) + kv('Current', d.current) + kv('Target', d.target)
+       + kv('Impact', d.impact) + kv('Action', d.action) + kv('Status', d.status);
+  }
+  h += `<button class="trace" onclick="trace('${id}')">↑ Trace to source</button>`;
+  h += `<div id="lineage"></div>`;
+  if(n.type==='Decision') h += diffHTML();
+  document.getElementById('ins').innerHTML = h;
+  network.selectNodes([id]);
+}
+function kv(k,v,bad){return `<div class="kv"><span class="k">${k}</span><span class="v ${bad?'bad':''}">${esc(v)}</span></div>`;}
+function listKV(k,arr){return `<div class="kv"><span class="k">${k}</span><span class="v">${(arr||[]).map(esc).join('<br>')||'—'}</span></div>`;}
+function reliedKV(arr){
+  const items = (arr||[]).map(r=>{
+    const bad = /public assistance|welfare|race|religion|marital|age/i.test(r);
+    return `<span class="v ${bad?'bad':''}">${bad?'⚠ ':''}${esc(r)}</span>`;
+  }).join('<br>');
+  return `<div class="kv"><span class="k">Relied on</span>${items||'—'}</div>`;
+}
+
+async function trace(id){
+  const r = await (await fetch('/api/lineage',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({node_id:id})})).json();
+  const el = document.getElementById('lineage');
+  el.className = 'show';
+  el.innerHTML = '<h2 style="margin-top:14px">Provenance</h2>' +
+    r.path.map(p=>`<div class="hop">${esc(p.label)}</div>`).join('');
+  // highlight the path in the graph
+  network.selectNodes(r.path.map(p=>p.id));
+}
+
+function diffHTML(){
+  const draft = fullGraph.nodes.find(n=>n.type==='DraftDecision');
+  const fin = fullGraph.nodes.find(n=>n.type==='Decision');
+  if(!draft||!fin) return '';
+  const li = (arr,strike)=> (arr||[]).map(r=>{
+    const bad = /public assistance|welfare|race|religion|marital|age/i.test(r);
+    const cls = bad ? (strike?'bad struck':'bad') : '';
+    return `<li class="${cls}">${bad?'⚠ ':''}${esc(r)}</li>`;
+  }).join('');
+  return `<div id="diff" class="show"><h2 style="margin-top:16px">Draft vs. final</h2><div class="diffrow">
+     <div class="dcard d"><h4>Draft — ${esc(draft.data.outcome)}</h4><ul>${li(draft.data.relied_on,true)}</ul></div>
+     <div class="dcard f"><h4>Final — ${esc(fin.data.outcome)}</h4><ul>${li(fin.data.relied_on,false)}</ul></div>
+   </div></div>`;
+}
+
+// ---------- boot ----------
+function renderCases(){
+  const wrap = document.getElementById('cases');
+  wrap.innerHTML = '';
+  CASES.forEach(c=>{
+    const b = document.createElement('button');
+    b.className = 'case' + (c.id===selected.id?' sel':'');
+    b.innerHTML = `<b>${c.name} · <span style="color:var(--accent);font-weight:600">${c.tag}</span></b><small>${c.desc}</small>`;
+    b.onclick = ()=>{ selected=c; renderCases(); };
+    wrap.appendChild(b);
+  });
+}
+initNet(); renderCases();
+document.getElementById('run').onclick = runCase;
+document.getElementById('reset').onclick = ()=>{
+  nodes.clear(); edges.clear();
+  document.getElementById('log').innerHTML='';
+  document.getElementById('banner').className='';
+  document.getElementById('remediation').className='';
+  document.getElementById('hint').style.display='block';
+  clearInspector();
+  fetch('/api/reset',{method:'POST'});
+};
+</script>
+</body>
+</html>

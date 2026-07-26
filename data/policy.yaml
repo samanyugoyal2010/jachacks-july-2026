@@ -1,0 +1,37 @@
+# Glass Box fairness policy — modeled on ECOA / Regulation B.
+# The NoDiscrimination agent reads these rules, reaches an INDEPENDENT verdict from
+# permissible facts, then checks the draft for dependence on a prohibited basis or a
+# proxy. A violation connects a `vetoes` edge back to the draft and the decision is re-made.
+
+rules:
+  - id: NO-DISCRIMINATION
+    prohibits: [race, color, religion, national origin, sex, marital status, age,
+                receipt of public assistance]
+    proxies: [zip code, postal code]      # facially neutral but correlated with a protected class
+    text: >
+      A credit decision must not rely on a prohibited basis under ECOA, nor on a
+      facially neutral proxy for one (ZIP code is the canonical case). Protected
+      characteristics are collected but structurally withheld from the analysts;
+      only this rule's agent may read them, to detect a leak.
+
+  - id: AFFORDABILITY
+    threshold_dti: 0.43
+    text: >
+      Debt-to-income at or above 43% is a permissible, non-discriminatory ground for
+      denial. This is a HARD rule: strong collateral does not override it, and an
+      approval that violates it is unsound and must be vetoed.
+
+  - id: INCOME-VERIFICATION
+    text: >
+      Affordability may only be assessed on verified income. Unverified income is a
+      FIXABLE, submission-level denial, not a substantive one.
+
+  - id: SPECIFIC-REASONS
+    text: >
+      An adverse action must state specific principal reasons, and must never cite a
+      prohibited-basis fact in the recourse given to the applicant.
+
+  - id: RECOURSE
+    text: >
+      Every denial must produce an applicant-facing plan (fixable or substantive), and
+      every node must trace back to the raw application.
