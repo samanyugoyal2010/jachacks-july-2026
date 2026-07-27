@@ -110,10 +110,16 @@ Pure-Jac (no server): `.venv/bin/jac run run_local.jac` · `.venv/bin/jac dot co
 
 ### Deploying the frontend (Vercel)
 
-The Next.js app lives in `web-ui/`, not at the repo root — pointing Vercel at the root is what
-produces `404: NOT_FOUND`. `vercel.json` builds the subdirectory. If the build still misses it, set
-**Root Directory → `web-ui`** in the Vercel project settings, which is the more reliable option and
-makes `vercel.json` unnecessary.
+The Next.js app lives in `web-ui/`, not at the repo root. Vercel defaults to building the root,
+finds no `package.json` with `next` in it, and serves `404: NOT_FOUND`.
+
+**The fix is one project setting.** In Vercel → your project → *Settings* → *Build & Deployment* →
+**Root Directory**, set it to `web-ui` and redeploy. Everything else (framework detection, the
+`/api/banks` serverless function, the build command) is then automatic.
+
+A root `vercel.json` cannot substitute for this: Vercel resolves the framework from the root
+`package.json` *before* it runs any custom `buildCommand`, so it fails with "No Next.js version
+detected" before the override is ever read.
 
 Set **`GROQ_API_KEY`** as an environment variable in the Vercel project — Bank match runs as a
 serverless route (`web-ui/src/app/api/banks/route.ts`) and calls Groq server-side. Without it the
