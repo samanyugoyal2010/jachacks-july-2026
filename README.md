@@ -71,25 +71,34 @@ Access control is enforced by **edge type**, not instructions:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv --python 3.12 .venv
 uv pip install --python .venv jaclang byllm fastapi "uvicorn[standard]"
-( cd web-next && npm install )
+( cd web-ui && npm install )
 
 # start backend (FastAPI :8000) + frontend (Next.js :3000)
 ./run.sh            # deterministic — bulletproof, offline, best for judging
 ./run.sh groq       # full pipeline reasons on Groq (gpt-oss-120b)
 ```
 
-Open **http://localhost:3000**. Three tabs:
+Open **http://localhost:3000**. Four pages:
 
-| Tab | What it's for |
+| Page | What it's for |
 |---|---|
-| **Apply** | The real product: fill in your own application → see the verdict in plain English, each agent's reasoning, the decision trail, and exactly what we read from your file. |
-| **Appeal & fix** | Unlocks *only* on a decline (badge appears in the nav). The specific reason, the concrete change that would qualify you, and a **Re-check** button that re-runs the real decision to prove the fix works. |
-| **How it works** | A 5-step manual plus five guided examples that each run the real pipeline down a different path. |
+| **How it works** (`/`) | The landing page. A five-step plain-English manual, then five example applicants you can run to see different outcomes before trusting it with your own details. |
+| **Apply** (`/apply`) | The real product. Enter your own income, debt, collateral and demographic details and get a decision. |
+| **Audit** (`/audit`) | The result: verdict, the Obsidian-style thought graph, each agent's deliberation, and everything we read from the application. |
+| **Appeal & fix** (`/appeal`) | Unlocks **only** on a decline (a red dot appears in the nav). The specific reason, the exact change that would qualify you, and a re-check that re-runs the real decision to prove it. |
 
-Two deliberate readability choices: raw application fields live in a **"What we read from your
-application"** panel (grouped by category, with sensitivity badges) rather than the graph, so the
-constellation stays a picture of *reasoning*; and the appeal flow is a separate page so an approved
-applicant never sees it.
+Three deliberate readability choices:
+
+- **Raw application data is not in the graph.** It lives in a *"What we read from the application"*
+  panel, grouped by category with sensitivity badges, so the constellation stays a picture of
+  reasoning rather than a wall of fields.
+- **Per-agent thought streams.** Each agent's actual chain of thought appears as it works, with the
+  active agent highlighted — the graph shows the artifacts, this shows the deliberation.
+- **The appeal flow is its own page**, so an approved applicant never sees it.
+
+The UI came from the `UI` branch and was originally built against static mock data. It is now wired
+to the live backend via `src/lib/audit/live.ts`, which maps `GraphState` / `RunCase` output into the
+shapes the dashboard renders. The older frontend is kept at `web-next/` as a fallback.
 
 Pure-Jac (no server): `.venv/bin/jac run run_local.jac` · `.venv/bin/jac dot core.jac`
 
@@ -127,8 +136,10 @@ Offline self-test: `.venv/bin/jac run test_agents.jac`
 ## Architecture
 
 ```
-  Next.js (web-next) — constellation graph + per-agent thought streams
-        │  /api/* proxied to the backend (next.config.js rewrites)
+  Next.js (web-ui) — audit dashboard: provenance graph, thought graph,
+                     agent timeline, policy panel, node inspector
+        │  src/lib/audit/live.ts maps the Jac output into the UI's types
+        │  /api/* proxied to the backend (next.config.ts rewrites)
         ▼
   app.py  — thin FastAPI shim: runs walkers on one shared root, serves JSON
         ▼
