@@ -29,3 +29,21 @@ export function saveMine(facts: Record<string, string>) {
 export function loadMine(): Record<string, string> | null {
   try { return JSON.parse(localStorage.getItem(MINE) || "null"); } catch { return null; }
 }
+
+/** The graph from the most recent run, so /appeal can read the plan.
+ *
+ *  The Jac engine keeps the graph server-side and /api/graph re-fetches it, but
+ *  a run decided by /api/decide exists only in that one response — nothing to
+ *  re-fetch. Stashing it here is what lets the appeal flow work for those. */
+const GRAPH = "glassbox:lastgraph";
+export function saveLastGraph(caseId: string, graph: unknown) {
+  try { sessionStorage.setItem(GRAPH, JSON.stringify({ caseId, graph })); } catch {}
+}
+export function loadLastGraph(caseId: string): unknown | null {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(GRAPH) || "null");
+    return v && v.caseId === caseId ? v.graph : null;
+  } catch {
+    return null;
+  }
+}

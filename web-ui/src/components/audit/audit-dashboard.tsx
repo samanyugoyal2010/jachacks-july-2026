@@ -259,6 +259,16 @@ export function AuditDashboard({ caseId, label, facts, isMine, autoRun }: AuditD
           {runPhase === "done" && (
             <p className="text-[11px] text-muted-foreground">
               Click any agent to see exactly what it did and the evidence it read.
+              {summary?.engine === "groq" ? (
+                <>
+                  {" "}
+                  Decided by the reasoning model, so the verdict can vary between runs — the
+                  deterministic Jac rules run locally via{" "}
+                  <code className="rounded bg-muted px-1 py-0.5">./run.sh</code>.
+                </>
+              ) : (
+                " Decided by the deterministic Jac rules."
+              )}
             </p>
           )}
           <PipelineDiagram
@@ -298,15 +308,14 @@ export function AuditDashboard({ caseId, label, facts, isMine, autoRun }: AuditD
         <Card className="border-destructive/40 bg-destructive/5">
           <CardContent className="flex flex-col gap-2 p-6">
             <h3 className="font-display text-sm font-bold text-foreground">
-              Your own application needs the live engine
+              Couldn&apos;t decide this application
             </h3>
             <p className="text-sm text-muted-foreground">
-              The five worked examples have a recorded run of the real pipeline, so they work
-              anywhere. Deciding numbers nobody has run before needs the Jac engine itself, which
-              keeps its provenance graph in a live process and can&apos;t run on a serverless host.
-              Start it with <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code>,
-              or deploy it (see the Dockerfile) and set{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">GLASSBOX_API</code>.
+              Neither engine was available: the Jac pipeline isn&apos;t running, and the reasoning
+              model couldn&apos;t be reached either. If it says rate-limited, waiting a moment and
+              running again usually clears it. Running{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code> locally decides
+              with the deterministic rules and never depends on the network.
             </p>
             <div className="mt-1 flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline">

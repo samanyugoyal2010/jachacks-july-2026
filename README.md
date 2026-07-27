@@ -10,14 +10,15 @@ catches decisions that leak on a protected characteristic — directly or by pro
 in either direction. On a denial, an **Advisor** turns the outcome into a concrete, provable
 reapplication plan.
 
-**This project is mostly Jac.** The codebase is written primarily in **[Jac](https://jaseci.org)**
-and we lean on it heavily: agents are walkers, the provenance graph *is* the database, access
-control is enforced by edge type, and every piece of reasoning is a `by llm()` function over typed
-`obj`s. `core.jac`, `agents.jac`, `run_local.jac`, `test_agents.jac` and `test_lineage.jac` carry
-the entire product — all seven agents, the graph schema, the fairness rules, the veto logic and the
-recourse engine live in Jac. The **Next.js** frontend renders the whole thing as a live "knowledge
-constellation" plus a per-agent thought-stream, and a thin FastAPI shim moves JSON; neither of them
-decides anything.
+**The backend is entirely [Jac](https://jaseci.org).** Every decision this system makes is made in
+Jac — all seven agents, the provenance graph, the sensitivity rules, the veto and the recourse
+engine live in `core.jac` and `agents.jac`, with `run_local.jac`, `test_agents.jac` and
+`test_lineage.jac` as the drivers and tests. We lean on the language heavily: agents are walkers,
+the provenance graph *is* the database, access control is enforced by edge type, and every piece of
+reasoning is a `by llm()` function over typed `obj`s. There is no decision logic anywhere else —
+`app.py` is a thin FastAPI shim that runs walkers and serializes JSON, and the **Next.js** frontend
+only renders what Jac already decided, as a live "knowledge constellation" plus a per-agent
+thought-stream.
 
 > **Working on the engine?** Read **[JAC.md](JAC.md)** — how Jac is used, setup, the verified
 > syntax gotchas, the Python↔Jac bridge, and how to add an agent or change a rule.
@@ -121,12 +122,40 @@ A root `vercel.json` cannot substitute for this: Vercel resolves the framework f
 `package.json` *before* it runs any custom `buildCommand`, so it fails with "No Next.js version
 detected" before the override is ever read.
 
-Set **`GROQ_API_KEY`** as an environment variable in the Vercel project — Bank match runs as a
-serverless route (`web-ui/src/app/api/banks/route.ts`) and calls Groq server-side. Without it the
-page still renders, using a deterministic estimate and saying so.
+Set **`GROQ_API_KEY`** as an environment variable in the Vercel project. Two serverless routes need
+it: Bank match (`api/banks`) and the decision pipeline that backs `/apply` (`api/decide`).
 
-That is the whole deployment. All five pages work, including `/audit` and `/appeal` for the five
-worked examples — see below for why, and for the one thing that still needs a live engine.
+That is the whole deployment — all five pages work, with no second host.
+
+### How a deployed decision gets made
+
+There are three ways the site can decide an application, tried in this order:
+
+| | Engine | Used for | Deterministic? |
+|---|---|---|---|
+| 1 | the live Jac pipeline | anything, whenever `./run.sh` is up | yes |
+| 2 | a recorded run of it | the five worked examples | yes |
+| 3 | `api/decide`, on Groq | applications submitted through `/apply` | **no** |
+
+Locally (1) always wins, so `./run.sh` behaves exactly as it always has.
+
+**Read this before demoing (3).** On the deployed site an application you type in is decided by the
+model, not by the rules in `core.jac`. The 43% DTI ceiling becomes an instruction it is given rather
+than a limit the code enforces, so the same applicant can get a different answer on a different run.
+The audit page says which engine produced each run.
+
+Three things are still enforced in code in `api/decide/route.ts`, because they are facts rather than
+judgements, and the demo's claims rest on them:
+
+- **Access control.** Fact classification is a key lookup, so `PROHIBITED_BASIS` facts are never put
+  into the analyst or adjudicator request bodies. A fact absent from the request cannot sway the
+  answer — true of a model as much as anything else.
+- **Independence.** The reviewer is dispatched *concurrently* with the adjudicator, so its request
+  is sent before a draft exists. It cannot have been anchored on one.
+- **Leak detection and the veto.** Whether an analyst leaned on a non-permissible fact is read off
+  the `cites` edges, and the veto arithmetic is plain code. Asking the model "was this
+  discriminatory?" produced a veto on *every* application in testing, which is the rubber-stamp
+  failure inverted.
 
 ### Why the demo cases work without a backend
 
@@ -149,14 +178,13 @@ recording when it can't reach one, so with `./run.sh` the site is fully live.
 **Re-run the generator whenever you change the agents, the thresholds, or the demo cases**,
 otherwise the deployed examples drift from what the code now does.
 
-**What still needs a live engine:** an application submitted through `/apply`. Numbers nobody has
-run before have no recording, so `/audit?mine=1` says so and points at the worked examples. To
-decide arbitrary input on a deployed site, host the engine as below and set `GLASSBOX_API`.
+The five examples are therefore genuine `core.jac` output even on Vercel, which is why they are the
+right thing to show a judge — `/apply` is for letting someone try their own numbers.
 
-### Optional: hosting the engine, so `/apply` works on the deployed site
+### Optional: hosting the engine, so deployed decisions are deterministic too
 
-Only needed if you want deployed visitors to submit their own numbers. Skip it and the five worked
-examples still run.
+Only needed if you want applications submitted on the deployed site decided by the real Jac rules
+rather than by the model. Skip it and `/apply` still works, via `api/decide`.
 
 Deploy the included `Dockerfile` to any host that runs a container — Render, Railway and Fly all
 work on a free or near-free tier:
@@ -223,10 +251,10 @@ Offline self-test: `.venv/bin/jac run test_agents.jac`
   data/policy.yaml   the NO-DISCRIMINATION rules
 ```
 
-Everything that decides is Jac. `app.py` and Next.js are transport + rendering — the Python file is
-a few dozen lines of shim, and the TypeScript only draws what the Jac walkers already decided. If
-you delete the frontend the product still runs end to end (`jac run run_local.jac`); if you delete
-the Jac there is nothing left.
+The entire backend is Jac. `app.py` and Next.js are transport + rendering — the Python file is a
+thin shim, and the TypeScript only draws what the Jac walkers already decided. If you delete the
+frontend the product still runs end to end (`jac run run_local.jac`); if you delete the Jac there is
+no product left.
 
 ## Verification
 

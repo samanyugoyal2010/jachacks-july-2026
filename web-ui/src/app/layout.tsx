@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, JetBrains_Mono, Poppins } from "next/font/google";
 import { BackgroundGlow } from "~/components/background-glow";
+import { JacBadge } from "~/components/jac-badge";
 import { Navbar } from "~/components/navbar";
 import { SmoothScroll } from "~/components/smooth-scroll";
 import { ThemeProvider } from "./theme-provider";
@@ -42,6 +43,7 @@ export default function RootLayout({
           <BackgroundGlow />
           <Navbar />
           {children}
+          <JacBadge />
         </ThemeProvider>
       </body>
     </html>

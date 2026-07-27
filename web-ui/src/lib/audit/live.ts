@@ -19,6 +19,7 @@ import type {
   TimelineLevel,
 } from "./types";
 import type { NodeUpdate, PolicyUpdate, RunStep } from "./data";
+import { loadLastGraph, saveLastGraph } from "./session";
 import { snapshotFor } from "./snapshots";
 
 // ---------- backend payload shapes (from GraphState / RunCase in core.jac) ----------
@@ -91,7 +92,8 @@ async function backend(path: string, init?: RequestInit): Promise<any> {
 }
 
 /** Fetch the current graph (used by the appeal page across navigation).
- *  Falls back to the recorded run for `caseId` when the engine is absent. */
+ *  Without a live engine: the recorded run for `caseId`, else the graph stashed
+ *  by the last `runScenario` (which is all a Groq-decided run leaves behind). */
 export async function getGraph(caseId?: string): Promise<JacGraph> {
   try {
     return await backend("/api/graph");
@@ -99,6 +101,8 @@ export async function getGraph(caseId?: string): Promise<JacGraph> {
     if (caseId) {
       const snap = await snapshotFor(caseId);
       if (snap) return snap.graph;
+      const stashed = loadLastGraph(caseId) as JacGraph | null;
+      if (stashed) return stashed;
     }
     throw e;
   }
@@ -514,23 +518,46 @@ async function liveRun(payload: {
   return { summary, graph: await backend("/api/graph") };
 }
 
+/** The Groq pipeline, for input nobody has a recorded run of. */
+async function groqRun(payload: {
+  case_id: string;
+  facts: Record<string, string>;
+}): Promise<{ summary: JacSummary; graph: JacGraph }> {
+  const res = await fetch("/api/decide", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(body?.error ?? `the reasoning model returned ${res.status}`);
+  }
+  return body;
+}
+
 export async function runScenario(payload: {
   case_id: string;
   raw_text?: string;
   facts: Record<string, string>;
 }): Promise<Scenario> {
-  // Prefer the live engine — it is the real thing and handles any input. Where
-  // it isn't reachable (a serverless host), the demo cases have a recorded run
-  // of this exact pipeline to fall back on. An applicant's own numbers do not,
-  // so those still surface the error.
+  // Three ways to get a decision, in descending order of fidelity:
+  //   1. the live Jac engine — deterministic rules, handles any input
+  //   2. a recorded run of it, for the demo cases (identical output, no engine)
+  //   3. the Groq pipeline, for input nobody has run before
+  // Locally (1) always wins, so ./run.sh behaves exactly as it always has.
   let summary: JacSummary;
   let graph: JacGraph;
   try {
     ({ summary, graph } = await liveRun(payload));
-  } catch (e) {
+  } catch {
     const snap = await snapshotFor(payload.case_id);
-    if (!snap) throw e;
-    ({ summary, graph } = snap);
+    if (snap) {
+      ({ summary, graph } = snap);
+    } else {
+      ({ summary, graph } = await groqRun({ case_id: payload.case_id, facts: payload.facts }));
+      // nothing server-side to re-fetch later, so keep it for /appeal
+      saveLastGraph(payload.case_id, graph);
+    }
   }
 
   const { nodes, edges } = toFlow(graph);

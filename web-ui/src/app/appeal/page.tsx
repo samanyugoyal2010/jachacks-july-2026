@@ -94,11 +94,11 @@ export default function Appeal() {
         <p className="text-sm text-muted-foreground">
           {engineDown ? (
             <>
-              This page needs the Jac agent pipeline, which keeps its provenance graph in a live
-              process and can&apos;t run on a serverless host. Either start it locally with{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code>, or deploy the
-              engine and set{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">GLASSBOX_API</code>.
+              We couldn&apos;t load your decision: neither the Jac pipeline nor the reasoning model
+              was reachable. Try the decision again from{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/audit</code>, or run{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code> locally to
+              decide with the deterministic rules.
             </>
           ) : (
             <>

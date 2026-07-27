@@ -9,15 +9,12 @@
  * not to reproduce any lender's real underwriting criteria, which are not
  * public. The page says so; keep it that way.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { type NextRequest, NextResponse } from "next/server";
+import { askGroqJson, loadGroqKey } from "~/lib/groq";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "openai/gpt-oss-120b";
 const TIMEOUT_MS = 25_000;
 
 interface Bank {
@@ -100,34 +97,6 @@ const BANKS: Bank[] = [
   },
 ];
 const BANK_IDS = new Set(BANKS.map((b) => b.id));
-
-// ---------- credentials ----------
-/** GROQ_API_KEY from the environment; locally, fall back to the repo-root .env
- *  so `./run.sh` works without a second copy of the key. On Vercel the file is
- *  absent and the env var is the only source. */
-function loadKey(): string {
-  const fromEnv = (process.env.GROQ_API_KEY ?? "").trim();
-  if (fromEnv) return fromEnv;
-  try {
-    const text = readFileSync(join(process.cwd(), "..", ".env"), "utf8");
-    for (const line of text.split("\n")) {
-      const t = line.trim();
-      if (!t || t.startsWith("#")) continue;
-      const eq = t.indexOf("=");
-      if (eq === -1) continue;
-      // the committed .env is written `GROQ_API_KEY = gsk_...` with spaces
-      if (t.slice(0, eq).trim() === "GROQ_API_KEY") {
-        return t
-          .slice(eq + 1)
-          .trim()
-          .replace(/^['"]|['"]$/g, "");
-      }
-    }
-  } catch {
-    // no .env (normal on Vercel) — fall through
-  }
-  return "";
-}
 
 // ---------- applicant profile ----------
 interface Profile {
@@ -293,26 +262,11 @@ Include all ten banks, using the exact ids given.`;
 async function askGroq(p: Profile, key: string): Promise<Rated[] | null> {
   let rated: unknown[];
   try {
-    const res = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-        messages: [{ role: "user", content: prompt(p) }],
-      }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+    const out = await askGroqJson<{ banks?: unknown[] }>(key, prompt(p), {
+      timeoutMs: TIMEOUT_MS,
+      temperature: 0.3,
     });
-    if (!res.ok) {
-      console.error(`[banks] groq HTTP ${res.status}; using fallback`);
-      return null;
-    }
-    const payload = await res.json();
-    rated = JSON.parse(payload.choices[0].message.content).banks ?? [];
+    rated = out.banks ?? [];
   } catch (e) {
     console.error(
       `[banks] groq unavailable (${e instanceof Error ? e.message : e}); using fallback`,
@@ -365,7 +319,7 @@ export async function POST(req: NextRequest) {
   }
 
   const p = toProfile(facts);
-  const key = loadKey();
+  const key = loadGroqKey();
   const results = key ? await askGroq(p, key) : null;
 
   if (!results) {
