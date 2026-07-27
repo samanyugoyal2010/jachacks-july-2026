@@ -8,7 +8,8 @@
     "start": "next start",
     "format": "biome format --write .",
     "lint": "biome check .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "snapshots": "cd .. && .venv/bin/python tools/gen_demo_snapshots.py"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.2",

@@ -14,7 +14,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { initialAgentStatuses } from "~/lib/audit/data";
-import { agentDetail, finalStatuses, runScenario, type Scenario } from "~/lib/audit/live";
+import { agentDetail, finalStatuses, retryEngine, runScenario, type Scenario } from "~/lib/audit/live";
 import { saveLast } from "~/lib/audit/session";
 import type { AgentId, AgentStatus, PolicyRule, TimelineEvent } from "~/lib/audit/types";
 import { cn } from "~/lib/utils";
@@ -109,6 +109,7 @@ export function AuditDashboard({ caseId, label, facts, isMine, autoRun }: AuditD
     reset();
     setRunError(null);
     setRunPhase("running");
+    retryEngine(); // a deliberate run always re-probes, in case it started since
 
     // The decisioning engine is a separate Jac/FastAPI process. On a static
     // host (Vercel) it is not reachable, so fail with an explanation instead of
@@ -297,15 +298,21 @@ export function AuditDashboard({ caseId, label, facts, isMine, autoRun }: AuditD
         <Card className="border-destructive/40 bg-destructive/5">
           <CardContent className="flex flex-col gap-2 p-6">
             <h3 className="font-display text-sm font-bold text-foreground">
-              The decision engine isn&apos;t reachable
+              Your own application needs the live engine
             </h3>
             <p className="text-sm text-muted-foreground">
-              This page runs the real Jac agent pipeline, which keeps its provenance graph in a
-              live process — it can&apos;t run on a serverless host. Either start it locally with{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code>, or deploy the
-              engine (see the Dockerfile) and point this site at it by setting{" "}
+              The five worked examples have a recorded run of the real pipeline, so they work
+              anywhere. Deciding numbers nobody has run before needs the Jac engine itself, which
+              keeps its provenance graph in a live process and can&apos;t run on a serverless host.
+              Start it with <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code>,
+              or deploy it (see the Dockerfile) and set{" "}
               <code className="rounded bg-muted px-1 py-0.5 text-xs">GLASSBOX_API</code>.
             </p>
+            <div className="mt-1 flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link href="/?examples=1">See a worked example</Link>
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground/80">Details: {runError}</p>
           </CardContent>
         </Card>

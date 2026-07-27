@@ -39,9 +39,9 @@ export default function Appeal() {
         setLabel(last.label);
         setCaseId(last.caseId);
       }
-      // needs the local Jac engine; on a static host it simply isn't there
+      // live engine first, then the recorded run for whichever case was last shown
       try {
-        setPlan(planOf(await getGraph()));
+        setPlan(planOf(await getGraph(last?.caseId)));
       } catch {
         setEngineDown(true);
       }

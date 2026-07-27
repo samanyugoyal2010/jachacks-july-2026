@@ -125,15 +125,38 @@ Set **`GROQ_API_KEY`** as an environment variable in the Vercel project — Bank
 serverless route (`web-ui/src/app/api/banks/route.ts`) and calls Groq server-side. Without it the
 page still renders, using a deterministic estimate and saying so.
 
-With just the above, `/`, `/apply` and `/banks` are fully functional. `/audit` and `/appeal` will
-report that the decision engine isn't reachable, because they need the Jac pipeline.
+That is the whole deployment. All five pages work, including `/audit` and `/appeal` for the five
+worked examples — see below for why, and for the one thing that still needs a live engine.
 
-### Deploying the decision engine (for `/audit` and `/appeal`)
+### Why the demo cases work without a backend
 
-The pipeline holds its provenance graph in process memory across the `reset → run → graph` request
-sequence, so it needs a **persistent process**, not a serverless function. Vercel can't host it
-either way: `jaclang` pulls in `llvmlite`, and the dependency tree is ~350MB against a 250MB
-function limit.
+The Jac pipeline can't run on Vercel. It keeps its provenance graph in process memory across the
+`reset → run → graph` sequence, so it needs a persistent process, and `jaclang` pulls in `llvmlite`
+for a ~350MB tree against a 250MB function limit.
+
+So the five demo cases are **precomputed**. `tools/gen_demo_snapshots.py` runs the real pipeline
+over the cases in `cases.ts` — plus the reapplication re-run for each denial — and freezes the
+output to `web-ui/public/demo-snapshots.json` (8 snapshots, 64KB):
+
+```bash
+.venv/bin/python tools/gen_demo_snapshots.py     # or: cd web-ui && npm run snapshots
+```
+
+Nothing there is hand-written or re-implemented: every verdict, chain of thought and graph edge came
+out of `core.jac`. The frontend always tries the live engine first and only falls back to a
+recording when it can't reach one, so with `./run.sh` the site is fully live.
+
+**Re-run the generator whenever you change the agents, the thresholds, or the demo cases**,
+otherwise the deployed examples drift from what the code now does.
+
+**What still needs a live engine:** an application submitted through `/apply`. Numbers nobody has
+run before have no recording, so `/audit?mine=1` says so and points at the worked examples. To
+decide arbitrary input on a deployed site, host the engine as below and set `GLASSBOX_API`.
+
+### Optional: hosting the engine, so `/apply` works on the deployed site
+
+Only needed if you want deployed visitors to submit their own numbers. Skip it and the five worked
+examples still run.
 
 Deploy the included `Dockerfile` to any host that runs a container — Render, Railway and Fly all
 work on a free or near-free tier:

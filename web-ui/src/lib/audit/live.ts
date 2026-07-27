@@ -19,6 +19,7 @@ import type {
   TimelineLevel,
 } from "./types";
 import type { NodeUpdate, PolicyUpdate, RunStep } from "./data";
+import { snapshotFor } from "./snapshots";
 
 // ---------- backend payload shapes (from GraphState / RunCase in core.jac) ----------
 export interface JacNode {
@@ -53,17 +54,33 @@ export interface RemediationPlanData {
   reapply_facts: Record<string, string>; steps: RemediationStepData[];
 }
 
+/** Once we know there is no engine, stop dialling it. Each attempt is a wasted
+ *  serverless invocation and a console error on every page view. Cleared by
+ *  `retryEngine()` so an explicit "Run again" always probes afresh. */
+let engineUnreachable = false;
+export function retryEngine() {
+  engineUnreachable = false;
+}
+
+const UNREACHABLE = "the decision engine is not reachable";
+
 /** The Jac/FastAPI engine is a separate process from this site. Turn any way it
  *  can be unreachable — connection refused, proxy 502, an HTML error page — into
  *  one clear error rather than a downstream JSON parse failure. */
 async function backend(path: string, init?: RequestInit): Promise<any> {
+  if (engineUnreachable) throw new Error(UNREACHABLE);
+
   let res: Response;
   try {
     res = await fetch(path, init);
   } catch {
-    throw new Error("the decision engine is not reachable");
+    engineUnreachable = true;
+    throw new Error(UNREACHABLE);
   }
   if (!res.ok) {
+    // A rewrite pointing at a dead upstream surfaces as 5xx; no rewrite at all
+    // surfaces as 404. Either way there is nothing to talk to.
+    if (res.status === 404 || res.status >= 500) engineUnreachable = true;
     throw new Error(`the decision engine returned ${res.status}`);
   }
   try {
@@ -73,9 +90,18 @@ async function backend(path: string, init?: RequestInit): Promise<any> {
   }
 }
 
-/** Fetch the current graph (used by the appeal page across navigation). */
-export async function getGraph(): Promise<JacGraph> {
-  return backend("/api/graph");
+/** Fetch the current graph (used by the appeal page across navigation).
+ *  Falls back to the recorded run for `caseId` when the engine is absent. */
+export async function getGraph(caseId?: string): Promise<JacGraph> {
+  try {
+    return await backend("/api/graph");
+  } catch (e) {
+    if (caseId) {
+      const snap = await snapshotFor(caseId);
+      if (snap) return snap.graph;
+    }
+    throw e;
+  }
 }
 
 /** The remediation plan attached to the final decision, if there is one. */
@@ -473,18 +499,40 @@ function snapshot(graph: JacGraph, summary: JacSummary, which: "draft" | "final"
 }
 
 // ---------- API ----------
-export async function runScenario(payload: {
+/** Run the pipeline for real. */
+async function liveRun(payload: {
   case_id: string;
   raw_text?: string;
   facts: Record<string, string>;
-}): Promise<Scenario> {
+}): Promise<{ summary: JacSummary; graph: JacGraph }> {
   await backend("/api/reset", { method: "POST" });
   const summary: JacSummary = await backend("/api/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ raw_text: "", ...payload }),
   });
-  const graph: JacGraph = await backend("/api/graph");
+  return { summary, graph: await backend("/api/graph") };
+}
+
+export async function runScenario(payload: {
+  case_id: string;
+  raw_text?: string;
+  facts: Record<string, string>;
+}): Promise<Scenario> {
+  // Prefer the live engine — it is the real thing and handles any input. Where
+  // it isn't reachable (a serverless host), the demo cases have a recorded run
+  // of this exact pipeline to fall back on. An applicant's own numbers do not,
+  // so those still surface the error.
+  let summary: JacSummary;
+  let graph: JacGraph;
+  try {
+    ({ summary, graph } = await liveRun(payload));
+  } catch (e) {
+    const snap = await snapshotFor(payload.case_id);
+    if (!snap) throw e;
+    ({ summary, graph } = snap);
+  }
+
   const { nodes, edges } = toFlow(graph);
   return {
     applicationId: summary.case_id,

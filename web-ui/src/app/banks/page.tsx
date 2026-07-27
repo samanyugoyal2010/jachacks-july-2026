@@ -75,7 +75,9 @@ export default function Banks() {
     setBusy(true);
     setError(null);
     try {
-      const facts = Object.fromEntries(Object.entries(f).filter(([, v]) => v !== ""));
+      const facts = Object.fromEntries(
+        Object.entries(f).filter(([, v]) => v !== ""),
+      );
       const res = await fetch("/api/banks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -98,9 +100,9 @@ export default function Banks() {
             Where else could you get this loan?
           </h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Glass Box only tells you what <em>we</em> decided. This estimates how ten major banks
-            would likely respond to the same numbers, so a decline here isn&apos;t the end of the
-            search.
+            Glass Box only tells you what <em>we</em> decided. This estimates
+            how ten major banks would likely respond to the same numbers, so a
+            decline here isn&apos;t the end of the search.
           </p>
         </div>
       </FadeIn>
@@ -109,10 +111,13 @@ export default function Banks() {
         <Card className="border-border/60 bg-card/70 backdrop-blur-xl">
           <CardContent className="flex flex-col gap-4 p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-display text-sm font-bold text-foreground">Your numbers</h2>
+              <h2 className="font-display text-sm font-bold text-foreground">
+                Your numbers
+              </h2>
               {prefilled && (
                 <span className="text-xs text-muted-foreground">
-                  Filled in from the application you submitted — edit anything to compare.
+                  Filled in from the application you submitted — edit anything
+                  to compare.
                 </span>
               )}
             </div>
@@ -138,7 +143,12 @@ export default function Banks() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="emp">Employment</Label>
-                <select id="emp" className={sel} value={f.employment} onChange={set("employment")}>
+                <select
+                  id="emp"
+                  className={sel}
+                  value={f.employment}
+                  onChange={set("employment")}
+                >
                   <option value="full_time">Full time</option>
                   <option value="part_time">Part time</option>
                   <option value="self_employed">Self employed</option>
@@ -207,7 +217,11 @@ export default function Banks() {
 
             <div className="flex flex-wrap items-center gap-3">
               <Button size="lg" disabled={!ready || busy} onClick={check}>
-                {busy ? "Checking ten banks…" : data ? "Check again" : "Check my odds"}
+                {busy
+                  ? "Checking ten banks…"
+                  : data
+                    ? "Check again"
+                    : "Check my odds"}
                 {!busy && <IconArrowRight className="size-4" />}
               </Button>
               {!ready && (
@@ -216,7 +230,10 @@ export default function Banks() {
                 </span>
               )}
               {!prefilled && ready && (
-                <Link href="/apply" className="text-xs text-primary hover:underline">
+                <Link
+                  href="/apply"
+                  className="text-xs text-primary hover:underline"
+                >
                   or run the full audited decision →
                 </Link>
               )}
@@ -224,7 +241,8 @@ export default function Banks() {
 
             {error && (
               <p className="text-xs text-destructive">
-                Couldn&apos;t get estimates: {error}. Is the backend running on :8000?
+                Couldn&apos;t get estimates: {error}. Is the backend running on
+                :8000?
               </p>
             )}
           </CardContent>
@@ -249,20 +267,29 @@ export default function Banks() {
             {data.banks.map((b) => {
               const band = BAND[b.verdict] ?? BAND.Borderline;
               return (
-                <Card key={b.id} className="border-border/60 bg-card/70 backdrop-blur-xl">
+                <Card
+                  key={b.id}
+                  className="border-border/60 bg-card/70 backdrop-blur-xl"
+                >
                   <CardContent className="flex flex-col gap-2.5 p-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                       <div className="flex items-baseline gap-2">
                         <span className="font-display text-base font-semibold text-foreground">
                           {b.name}
                         </span>
-                        <span className="text-xs text-muted-foreground">{b.blurb}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {b.blurb}
+                        </span>
                       </div>
                       <div className="flex items-baseline gap-2">
-                        <span className={`font-display text-xl font-semibold ${band.text}`}>
+                        <span
+                          className={`font-display text-xl font-semibold ${band.text}`}
+                        >
                           {b.chance}%
                         </span>
-                        <span className={`text-xs font-medium ${band.text}`}>{b.verdict}</span>
+                        <span className={`text-xs font-medium ${band.text}`}>
+                          {b.verdict}
+                        </span>
                       </div>
                     </div>
 
@@ -277,17 +304,22 @@ export default function Banks() {
                       />
                     </div>
 
-                    <p className="text-sm leading-relaxed text-muted-foreground">{b.why}</p>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {b.why}
+                    </p>
                   </CardContent>
                 </Card>
               );
             })}
 
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              <strong className="text-foreground">These are estimates, not offers.</strong> Real
-              underwriting criteria are not public, so the bank profiles behind these numbers are
-              illustrative and the percentages are generated by an AI model — they will shift
-              between runs. Nothing here is a lending decision, a credit check, or financial advice.
+              <strong className="text-foreground">
+                These are estimates, not offers.
+              </strong>{" "}
+              Real underwriting criteria are not public, so the bank profiles
+              behind these numbers are illustrative and the percentages are
+              generated by an AI model — they will shift between runs. Nothing
+              here is a lending decision, a credit check, or financial advice.
               Only an application to the bank itself can tell you the answer.
             </p>
           </div>
