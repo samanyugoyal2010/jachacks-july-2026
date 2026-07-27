@@ -1,0 +1,6 @@
+# Glass Box backend — the Jac decisioning engine behind app.py.
+# Pinned to the versions the pipeline was verified against.
+jaclang==0.16.7
+byllm==0.6.19
+fastapi==0.140.0
+uvicorn[standard]==0.51.0

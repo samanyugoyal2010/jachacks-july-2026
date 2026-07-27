@@ -125,10 +125,32 @@ Set **`GROQ_API_KEY`** as an environment variable in the Vercel project — Bank
 serverless route (`web-ui/src/app/api/banks/route.ts`) and calls Groq server-side. Without it the
 page still renders, using a deterministic estimate and saying so.
 
-**What works on Vercel and what doesn't.** `/`, `/apply` and `/banks` are fully functional. `/audit`
-and `/appeal` need the Jac agent pipeline, which is a stateful local Python process and cannot run
-on a serverless host — they detect this and say so rather than hanging. To demo those, run the
-backend and either use `localhost` or point `GLASSBOX_API` at a host running `app.py`.
+With just the above, `/`, `/apply` and `/banks` are fully functional. `/audit` and `/appeal` will
+report that the decision engine isn't reachable, because they need the Jac pipeline.
+
+### Deploying the decision engine (for `/audit` and `/appeal`)
+
+The pipeline holds its provenance graph in process memory across the `reset → run → graph` request
+sequence, so it needs a **persistent process**, not a serverless function. Vercel can't host it
+either way: `jaclang` pulls in `llvmlite`, and the dependency tree is ~350MB against a 250MB
+function limit.
+
+Deploy the included `Dockerfile` to any host that runs a container — Render, Railway and Fly all
+work on a free or near-free tier:
+
+1. Point the host at this repo. It builds from the root `Dockerfile`; `requirements.txt` pins the
+   verified versions.
+2. Set **`ALLOWED_ORIGINS`** to your Vercel URL (e.g. `https://your-app.vercel.app`).
+   `*.vercel.app` preview deploys are already allowed by a regex.
+3. Optionally set `GLASSBOX_LLM=groq` and `GROQ_API_KEY` to have the narratives reason on Groq.
+4. Back in Vercel, set **`GLASSBOX_API`** to the engine's URL and redeploy. It is read at build
+   time by `next.config.ts`, so a redeploy is required for it to take effect.
+
+**Run a single instance.** Two replicas would each hold a separate graph, and a `run` could land on
+an instance that never saw the matching `reset`.
+
+`app.py` binds `127.0.0.1:8000` locally and reads `HOST`/`PORT` when a host injects them, so
+`./run.sh` is unaffected by any of this.
 
 ---
 

@@ -94,10 +94,11 @@ export default function Appeal() {
         <p className="text-sm text-muted-foreground">
           {engineDown ? (
             <>
-              This page needs the Jac agent pipeline, which runs as a separate local process and
-              can&apos;t be hosted on a static site. Start it with{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code> from the
-              project root.
+              This page needs the Jac agent pipeline, which keeps its provenance graph in a live
+              process and can&apos;t run on a serverless host. Either start it locally with{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code>, or deploy the
+              engine and set{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">GLASSBOX_API</code>.
             </>
           ) : (
             <>

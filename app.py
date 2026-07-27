@@ -7,6 +7,7 @@ browser, and serves the static frontend from the same origin (no CORS needed).
 """
 from __future__ import annotations
 
+import os
 import threading
 from pathlib import Path
 
@@ -35,9 +36,16 @@ def run_walker(name: str, attrs: dict | None = None):
 
 
 app = FastAPI(title="Glass Box")
+
+# Local dev talks to :3000. When this process is hosted (so a deployed frontend
+# can reach it), add the site's origin via ALLOWED_ORIGINS, comma-separated.
+ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+ORIGINS += [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # preview deploys get a new host each time
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -97,4 +105,11 @@ app.mount("/vendor", StaticFiles(directory=str(BASE / "web" / "vendor")), name="
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")
+    # Hosts (Render, Railway, Fly) inject $PORT and require binding 0.0.0.0.
+    # Locally both default back to the original 127.0.0.1:8000.
+    uvicorn.run(
+        app,
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "8000")),
+        log_level="warning",
+    )

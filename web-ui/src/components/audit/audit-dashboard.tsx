@@ -297,13 +297,14 @@ export function AuditDashboard({ caseId, label, facts, isMine, autoRun }: AuditD
         <Card className="border-destructive/40 bg-destructive/5">
           <CardContent className="flex flex-col gap-2 p-6">
             <h3 className="font-display text-sm font-bold text-foreground">
-              The decision engine isn&apos;t running
+              The decision engine isn&apos;t reachable
             </h3>
             <p className="text-sm text-muted-foreground">
-              This page needs the Jac agent pipeline, which runs as a separate local process —
-              it can&apos;t be hosted on a static site. Start it with{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code> from the
-              project root, then run the audit again.
+              This page runs the real Jac agent pipeline, which keeps its provenance graph in a
+              live process — it can&apos;t run on a serverless host. Either start it locally with{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code>, or deploy the
+              engine (see the Dockerfile) and point this site at it by setting{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">GLASSBOX_API</code>.
             </p>
             <p className="text-xs text-muted-foreground/80">Details: {runError}</p>
           </CardContent>
