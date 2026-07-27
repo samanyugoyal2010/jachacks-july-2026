@@ -10,9 +10,14 @@ catches decisions that leak on a protected characteristic — directly or by pro
 in either direction. On a denial, an **Advisor** turns the outcome into a concrete, provable
 reapplication plan.
 
-Built in **[Jac](https://jaseci.org)** (agents = walkers, the graph = the database, reasoning =
-`by llm()`), with a **Next.js** frontend that renders the whole thing as a live "knowledge
-constellation" plus a per-agent thought-stream.
+**This project is mostly Jac.** The codebase is written primarily in **[Jac](https://jaseci.org)**
+and we lean on it heavily: agents are walkers, the provenance graph *is* the database, access
+control is enforced by edge type, and every piece of reasoning is a `by llm()` function over typed
+`obj`s. `core.jac`, `agents.jac`, `run_local.jac`, `test_agents.jac` and `test_lineage.jac` carry
+the entire product — all seven agents, the graph schema, the fairness rules, the veto logic and the
+recourse engine live in Jac. The **Next.js** frontend renders the whole thing as a live "knowledge
+constellation" plus a per-agent thought-stream, and a thin FastAPI shim moves JSON; neither of them
+decides anything.
 
 > **Working on the engine?** Read **[JAC.md](JAC.md)** — how Jac is used, setup, the verified
 > syntax gotchas, the Python↔Jac bridge, and how to add an agent or change a rule.
@@ -38,7 +43,7 @@ algorithmic decisions).
 
 ---
 
-## The seven agents (`core.jac`)
+## The seven agents (`core.jac`, all Jac walkers)
 
 1. **Intake** — reads the full application package and classifies every fact by **sensitivity**:
    `PERMISSIBLE`, `PROHIBITED_BASIS` (protected characteristic), or `PROXY_RISK` (facially neutral
@@ -78,12 +83,13 @@ uv pip install --python .venv jaclang byllm fastapi "uvicorn[standard]"
 ./run.sh groq       # full pipeline reasons on Groq (gpt-oss-120b)
 ```
 
-Open **http://localhost:3000**. Four pages:
+Open **http://localhost:3000**. Five pages:
 
 | Page | What it's for |
 |---|---|
 | **How it works** (`/`) | The landing page. A five-step plain-English manual, then five example applicants you can run to see different outcomes before trusting it with your own details. |
 | **Apply** (`/apply`) | The real product. Enter your own income, debt, collateral and demographic details and get a decision. |
+| **Bank match** (`/banks`) | Ten major banks, ranked by how likely each is to accept the same numbers. Estimated by Groq; the bank profiles are illustrative, not real underwriting criteria. |
 | **Audit** (`/audit`) | The result: verdict, the Obsidian-style thought graph, each agent's deliberation, and everything we read from the application. |
 | **Appeal & fix** (`/appeal`) | Unlocks **only** on a decline (a red dot appears in the nav). The specific reason, the exact change that would qualify you, and a re-check that re-runs the real decision to prove it. |
 
@@ -102,6 +108,22 @@ shapes the dashboard renders. The older frontend is kept at `web-next/` as a fal
 
 Pure-Jac (no server): `.venv/bin/jac run run_local.jac` · `.venv/bin/jac dot core.jac`
 
+### Deploying the frontend (Vercel)
+
+The Next.js app lives in `web-ui/`, not at the repo root — pointing Vercel at the root is what
+produces `404: NOT_FOUND`. `vercel.json` builds the subdirectory. If the build still misses it, set
+**Root Directory → `web-ui`** in the Vercel project settings, which is the more reliable option and
+makes `vercel.json` unnecessary.
+
+Set **`GROQ_API_KEY`** as an environment variable in the Vercel project — Bank match runs as a
+serverless route (`web-ui/src/app/api/banks/route.ts`) and calls Groq server-side. Without it the
+page still renders, using a deterministic estimate and saying so.
+
+**What works on Vercel and what doesn't.** `/`, `/apply` and `/banks` are fully functional. `/audit`
+and `/appeal` need the Jac agent pipeline, which is a stateful local Python process and cannot run
+on a serverless host — they detect this and say so rather than hanging. To demo those, run the
+backend and either use `localhost` or point `GLASSBOX_API` at a host running `app.py`.
+
 ---
 
 ## The demo packages
@@ -119,7 +141,7 @@ indistinguishable from no check.
 
 ---
 
-## The LLM layer (`agents.jac`)
+## The LLM layer (`agents.jac`, Jac's `by llm()`)
 
 `by llm()` functions filling typed `obj`s — the `sem` string *is* the prompt.
 
@@ -139,7 +161,8 @@ Offline self-test: `.venv/bin/jac run test_agents.jac`
   Next.js (web-ui) — audit dashboard: provenance graph, thought graph,
                      agent timeline, policy panel, node inspector
         │  src/lib/audit/live.ts maps the Jac output into the UI's types
-        │  /api/* proxied to the backend (next.config.ts rewrites)
+        │  /api/{run,graph,lineage,reset} proxied to the backend (next.config.ts)
+        │  /api/banks is a Next route handler — no backend, so it works on Vercel
         ▼
   app.py  — thin FastAPI shim: runs walkers on one shared root, serves JSON
         ▼
@@ -149,7 +172,10 @@ Offline self-test: `.venv/bin/jac run test_agents.jac`
   data/policy.yaml   the NO-DISCRIMINATION rules
 ```
 
-Everything that decides is Jac. `app.py` and Next.js are transport + rendering.
+Everything that decides is Jac. `app.py` and Next.js are transport + rendering — the Python file is
+a few dozen lines of shim, and the TypeScript only draws what the Jac walkers already decided. If
+you delete the frontend the product still runs end to end (`jac run run_local.jac`); if you delete
+the Jac there is nothing left.
 
 ## Verification
 

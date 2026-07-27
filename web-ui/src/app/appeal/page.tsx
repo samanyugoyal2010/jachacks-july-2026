@@ -28,6 +28,7 @@ export default function Appeal() {
   const [result, setResult] = useState<string | null>(null);
   const [rerun, setRerun] = useState<Scenario | null>(null);
   const [showWork, setShowWork] = useState(false);
+  const [engineDown, setEngineDown] = useState(false);
   const [picked, setPicked] = useState<AgentId | null>(null);
   const resultRef = useRef<HTMLDivElement | null>(null);
 
@@ -38,7 +39,12 @@ export default function Appeal() {
         setLabel(last.label);
         setCaseId(last.caseId);
       }
-      setPlan(planOf(await getGraph()));
+      // needs the local Jac engine; on a static host it simply isn't there
+      try {
+        setPlan(planOf(await getGraph()));
+      } catch {
+        setEngineDown(true);
+      }
       setLoading(false);
     })();
   }, []);
@@ -51,10 +57,17 @@ export default function Appeal() {
     setShowWork(false);
     setPicked(null);
     // the run is fast; hold the "re-running" state briefly so the click registers visually
-    const [sc] = await Promise.all([
-      runScenario({ case_id: `${caseId}-REAPPLY`, facts: plan.reapply_facts }),
-      new Promise((r) => setTimeout(r, 650)),
-    ]);
+    let sc: Scenario;
+    try {
+      [sc] = await Promise.all([
+        runScenario({ case_id: `${caseId}-REAPPLY`, facts: plan.reapply_facts }),
+        new Promise((r) => setTimeout(r, 650)),
+      ]);
+    } catch {
+      setEngineDown(true);
+      setBusy(false);
+      return;
+    }
     setResult(sc.summary.final_outcome);
     setRerun(sc);
     setBusy(false);
@@ -79,8 +92,19 @@ export default function Appeal() {
           Appeal &amp; fix
         </h1>
         <p className="text-sm text-muted-foreground">
-          This page unlocks only when an application is declined. There&apos;s nothing to appeal
-          right now.
+          {engineDown ? (
+            <>
+              This page needs the Jac agent pipeline, which runs as a separate local process and
+              can&apos;t be hosted on a static site. Start it with{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code> from the
+              project root.
+            </>
+          ) : (
+            <>
+              This page unlocks only when an application is declined. There&apos;s nothing to
+              appeal right now.
+            </>
+          )}
         </p>
         <div className="flex gap-3">
           <Button asChild>

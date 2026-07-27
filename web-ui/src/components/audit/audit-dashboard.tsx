@@ -67,6 +67,7 @@ export function AuditDashboard({ caseId, label, facts, isMine, autoRun }: AuditD
   const [policyRules, setPolicyRules] = useState<PolicyRule[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [runPhase, setRunPhase] = useState<RunPhase>("idle");
+  const [runError, setRunError] = useState<string | null>(null);
   const [showTrace, setShowTrace] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentId | null>(null);
 
@@ -106,9 +107,20 @@ export function AuditDashboard({ caseId, label, facts, isMine, autoRun }: AuditD
 
   const runAudit = useCallback(async () => {
     reset();
+    setRunError(null);
     setRunPhase("running");
 
-    const sc = await runScenario({ case_id: caseId, facts });
+    // The decisioning engine is a separate Jac/FastAPI process. On a static
+    // host (Vercel) it is not reachable, so fail with an explanation instead of
+    // spinning forever.
+    let sc: Scenario;
+    try {
+      sc = await runScenario({ case_id: caseId, facts });
+    } catch (e) {
+      setRunError(e instanceof Error ? e.message : "the decision engine did not respond");
+      setRunPhase("idle");
+      return;
+    }
     setScenario(sc);
     setPolicyRules(sc.policyRules);
     setAgentStatuses(sc.agentStatuses);
@@ -281,6 +293,23 @@ export function AuditDashboard({ caseId, label, facts, isMine, autoRun }: AuditD
       })()}
 
       {/* ---------- the beat ---------- */}
+      {runError && (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="flex flex-col gap-2 p-6">
+            <h3 className="font-display text-sm font-bold text-foreground">
+              The decision engine isn&apos;t running
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              This page needs the Jac agent pipeline, which runs as a separate local process —
+              it can&apos;t be hosted on a static site. Start it with{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">./run.sh</code> from the
+              project root, then run the audit again.
+            </p>
+            <p className="text-xs text-muted-foreground/80">Details: {runError}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {runPhase === "idle" && (
         <Card className="border-border/60 bg-card/70">
           <CardContent className="flex flex-col items-center gap-3 p-10 text-center">

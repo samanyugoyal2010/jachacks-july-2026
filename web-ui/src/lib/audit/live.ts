@@ -53,9 +53,29 @@ export interface RemediationPlanData {
   reapply_facts: Record<string, string>; steps: RemediationStepData[];
 }
 
+/** The Jac/FastAPI engine is a separate process from this site. Turn any way it
+ *  can be unreachable — connection refused, proxy 502, an HTML error page — into
+ *  one clear error rather than a downstream JSON parse failure. */
+async function backend(path: string, init?: RequestInit): Promise<any> {
+  let res: Response;
+  try {
+    res = await fetch(path, init);
+  } catch {
+    throw new Error("the decision engine is not reachable");
+  }
+  if (!res.ok) {
+    throw new Error(`the decision engine returned ${res.status}`);
+  }
+  try {
+    return await res.json();
+  } catch {
+    throw new Error("the decision engine returned an unexpected response");
+  }
+}
+
 /** Fetch the current graph (used by the appeal page across navigation). */
 export async function getGraph(): Promise<JacGraph> {
-  return (await fetch("/api/graph")).json();
+  return backend("/api/graph");
 }
 
 /** The remediation plan attached to the final decision, if there is one. */
@@ -458,15 +478,13 @@ export async function runScenario(payload: {
   raw_text?: string;
   facts: Record<string, string>;
 }): Promise<Scenario> {
-  await fetch("/api/reset", { method: "POST" });
-  const summary: JacSummary = await (
-    await fetch("/api/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raw_text: "", ...payload }),
-    })
-  ).json();
-  const graph: JacGraph = await (await fetch("/api/graph")).json();
+  await backend("/api/reset", { method: "POST" });
+  const summary: JacSummary = await backend("/api/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ raw_text: "", ...payload }),
+  });
+  const graph: JacGraph = await backend("/api/graph");
   const { nodes, edges } = toFlow(graph);
   return {
     applicationId: summary.case_id,

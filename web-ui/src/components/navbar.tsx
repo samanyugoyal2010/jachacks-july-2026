@@ -11,6 +11,7 @@ import { cn } from "~/lib/utils";
 const links = [
   { href: "/", label: "How it works" },
   { href: "/apply", label: "Apply" },
+  { href: "/banks", label: "Bank match" },
   { href: "/appeal", label: "Appeal & fix" },
 ];
 
