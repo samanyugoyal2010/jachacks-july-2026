@@ -1,0 +1,16 @@
+.vercel
+.next
+node_modules
+out
+dist
+coverage
+test-results
+playwright-report
+outputs
+work
+.env
+.env*.local
+*.log
+Glass_Box_Hackathon_Deck.pptx
+Glass_Box_Hackathon_Deck.pptx.inspect.ndjson
+glass_box_deck_build
